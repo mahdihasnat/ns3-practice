@@ -1,20 +1,15 @@
-# Makefile wrapper for waf
-
-all:
-	./waf
-
-# free free to change this part to suit your requirements
 configure:
-	./waf configure --enable-examples --enable-tests
+	./waf -j8 configure --enable-examples --enable-tests
 
-build:
-	./waf build
+compile:
+	./waf -j8
+run:
+	./waf -j8 
+	./waf -j8 --run scratch/$(t)
 
-install:
-	./waf install
+second:
+	./waf -j8
+	./waf -j8 --run "scratch/second --nCsma=5 --verbose=true" NS_LOG="SecondScriptExample"
 
-clean:
-	./waf clean
-
-distclean:
-	./waf distclean
+third: compile
+	./waf -j8 --run "scratch/third --nCsma=5 nWifi=2 --verbose=true --tracing=true" NS_LOG="ThirdScriptExample"
