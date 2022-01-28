@@ -77,6 +77,7 @@ main (int argc, char *argv[])
   AnimationInterface anim("first.xml");
   anim.SetConstantPosition(nodes.Get(0),0,0);
   anim.SetConstantPosition(nodes.Get(1),100,0);
+  anim.EnablePacketMetadata (true);
 
   std::ofstream ascii;
   ascii.open ("first.tr");
