@@ -1,5 +1,5 @@
 # installation
-`qmake`
+`qmake` or `qtchooser -run-tool=qmake -qt=default`
 
 `make -j8`
 

@@ -45,7 +45,7 @@ main(int argc, char * argv[])
 
 	InternetStackHelper internet;
 	AodvHelper aodv;
-	internet.SetRoutingHelper(aodv);
+	// internet.SetRoutingHelper(aodv);
 	// internet.SetIpv4StackInstall(false);
 	internet.Install(nodes);
 
@@ -102,11 +102,16 @@ main(int argc, char * argv[])
 
 	AnimationInterface anim ("linear_networks.xml");
 	anim.EnablePacketMetadata(true);
+	anim.EnableIpv4RouteTracking("linear_networks_routing.xml", Seconds(0), Seconds(10), Seconds(0.25));
+
 	for(int i=0;i<totalNodes;i++)
 	{
 		anim.SetConstantPosition(nodes.Get(i),i*100,i*100,0);
 		anim.UpdateNodeSize(i, 10, 10);
 	}
+
+	// enable routing
+	Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
 	Simulator::Stop(Seconds(20.0));
 	Simulator::Run();

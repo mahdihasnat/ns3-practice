@@ -3,3 +3,5 @@ NetAnim
 qrc_*
 *.moc
 Makefile
+.qmake.stash
+qrc_qtpropertybrowser.cpp
