@@ -10,7 +10,8 @@ def build(bld):
     module = bld.create_ns3_module('tora', ['core'])
     module.source = [
         'model/tora.cc',
-        'helper/tora-helper.cc',
+        # 'model/tora-routing-protocol.cc',
+        # 'helper/tora-helper.cc',
         ]
 
     module_test = bld.create_ns3_module_test_library('tora')
@@ -27,7 +28,8 @@ def build(bld):
     headers.module = 'tora'
     headers.source = [
         'model/tora.h',
-        'helper/tora-helper.h',
+        # 'model/tora-routing-protocol.h',
+        # 'helper/tora-helper.h',
         ]
 
     if bld.env.ENABLE_EXAMPLES:

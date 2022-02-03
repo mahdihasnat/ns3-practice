@@ -22,10 +22,14 @@ main(int argc, char * argv[])
 	Time::SetResolution (Time::NS);
 	LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
 	LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
+	// LogComponentEnable ("AodvRoutingProtocol", LOG_LEVEL_ALL);
 	// LogComponentEnable ("GlobalRouteManagerImpl", LOG_LEVEL_INFO);
 	// LogComponentEnable ("GlobalRouteManager", LOG_LEVEL_INFO);
 	
-  	
+	
+	// disable hellopacket in all node of routing
+	Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
+
 	int totalNodes = 2;
 
 	CommandLine cmd (__FILE__);
@@ -45,7 +49,7 @@ main(int argc, char * argv[])
 
 	InternetStackHelper internet;
 	AodvHelper aodv;
-	// internet.SetRoutingHelper(aodv);
+	internet.SetRoutingHelper(aodv);
 	// internet.SetIpv4StackInstall(false);
 	internet.Install(nodes);
 
@@ -111,7 +115,7 @@ main(int argc, char * argv[])
 	}
 
 	// enable routing
-	Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+	// Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
 	Simulator::Stop(Seconds(20.0));
 	Simulator::Run();
