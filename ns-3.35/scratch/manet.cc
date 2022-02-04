@@ -20,21 +20,23 @@ public:
 	double m_nodeSpeed;
 	YansWifiPhyHelper m_wifiPhy;
 
-
 	RoutingExperiment(int n, int nFlows, double nodeSpeed)
 	{
 		this->m_totalNodes = n;
 		this->m_totalFlows = nFlows;
 		this->m_nodeSpeed = nodeSpeed;
+		NS_LOG_INFO("Total nodes: " << this->m_totalNodes);
+		NS_LOG_INFO("Total flows: " << this->m_totalFlows);
+		NS_LOG_INFO("Node speed: " << this->m_nodeSpeed);
 	}
 
-	void AddMobility(NodeContainer &adhocNodes);
+	virtual void AddMobility(NodeContainer &adhocNodes);
 	NetDeviceContainer AddDevie(NodeContainer &adhocNodes);
 	Ipv4InterfaceContainer AssignAddress(NetDeviceContainer &adhocDevices);
 	void InstallInternetStack(NodeContainer &adhocNodes, Ipv4RoutingHelper *routingHelper);
 	void SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime);
 	void SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16_t serverPort, double startTime, double endTime);
-	void AddFlows(int nFlows, NodeContainer &adhocNodes);
+	void AddFlows(NodeContainer &adhocNodes);
 
 	void Run(double simulationTime, Ipv4RoutingHelper *routingHelper)
 	{
@@ -47,36 +49,40 @@ public:
 		AddMobility(adhocNodes);
 		InstallInternetStack(adhocNodes, routingHelper);
 		Ipv4InterfaceContainer adhocInterfaces = AssignAddress(adhocDevices);
-		AddFlows(m_totalFlows, adhocNodes);
+		AddFlows(adhocNodes);
 
 		AnimationInterface anim("manet.xml");
 		anim.EnablePacketMetadata(true);
+		// resize nodes
+		for(int i=0;i<m_totalNodes ; i++)
+		{
+			anim.UpdateNodeSize(i, 10, 10);
+		}
+
 
 		// enable trace generation
 		AsciiTraceHelper ascii;
 		m_wifiPhy.EnableAsciiAll(ascii.CreateFileStream("manet.tr"));
 
 		// enable flow monitor
-		
+
 		Ptr<FlowMonitor> flowmon;
 		FlowMonitorHelper flowmonHelper;
-		flowmon = flowmonHelper.InstallAll ();
-
+		flowmon = flowmonHelper.InstallAll();
 
 		Simulator::Stop(Seconds(simulationTime));
 		Simulator::Run();
 		Simulator::Destroy();
 
 		flowmon->SerializeToXmlFile("manet.flowmon", true, true);
-
 	}
 };
 
 int main(int argc, char *argv[])
 {
 
-	int n = 10;
-	int nflows = 10;
+	int n = 2;
+	int nflows = 2;
 	// int packetRate=10; // number of packet per sec
 	double nodeSpeed = 20;		   // in m/s
 	double simulationTime = 100.0; // in s
@@ -90,19 +96,22 @@ int main(int argc, char *argv[])
 	cmd.Parse(argc, argv);
 
 	RoutingExperiment experiment(n, nflows, nodeSpeed);
+
+	// disable hellopacket in all node of routing
+	Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
+
 	experiment.Run(simulationTime, new AodvHelper());
 }
 
-void RoutingExperiment::
-	AddMobility(NodeContainer &adhocNodes)
+void RoutingExperiment::AddMobility(NodeContainer &adhocNodes)
 {
 	double nodeSpeed = m_nodeSpeed; //  in m/s , default=20
-	double nodePause = 0; // in s
+	double nodePause = 0;			// in s
 
 	ObjectFactory pos;
 	pos.SetTypeId("ns3::RandomRectanglePositionAllocator");
-	pos.Set("X", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=300.0]"));
-	pos.Set("Y", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=1500.0]"));
+	pos.Set("X", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=100.0]"));
+	pos.Set("Y", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=100.0]"));
 
 	Ptr<PositionAllocator> taPositionAlloc = pos.Create()->GetObject<PositionAllocator>();
 
@@ -121,8 +130,7 @@ void RoutingExperiment::
 }
 
 NetDeviceContainer
-RoutingExperiment::
-	AddDevie(NodeContainer &adhocNodes)
+RoutingExperiment::AddDevie(NodeContainer &adhocNodes)
 {
 	string phyMode = "DsssRate11Mbps";
 	string rate = "2048bps";
@@ -147,31 +155,26 @@ RoutingExperiment::
 	m_wifiPhy.Set("TxPowerStart", DoubleValue(txp));
 	m_wifiPhy.Set("TxPowerEnd", DoubleValue(txp));
 
-	
-
 	wifiMac.SetType("ns3::AdhocWifiMac");
 	return wifi.Install(m_wifiPhy, wifiMac, adhocNodes);
 }
 
 Ipv4InterfaceContainer
-RoutingExperiment::
-	AssignAddress(NetDeviceContainer &adhocDevices)
+RoutingExperiment::AssignAddress(NetDeviceContainer &adhocDevices)
 {
 	Ipv4AddressHelper addressAdhoc;
 	addressAdhoc.SetBase("10.1.1.0", "255.255.255.0");
 	return addressAdhoc.Assign(adhocDevices);
 }
 
-void RoutingExperiment::
-	InstallInternetStack(NodeContainer &adhocNodes, Ipv4RoutingHelper *routingHelper)
+void RoutingExperiment::InstallInternetStack(NodeContainer &adhocNodes, Ipv4RoutingHelper *routingHelper)
 {
 	InternetStackHelper internet;
 	internet.SetRoutingHelper(*routingHelper);
 	internet.Install(adhocNodes);
 }
 
-void RoutingExperiment::
-	SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime)
+void RoutingExperiment::SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime)
 {
 	UdpEchoServerHelper echoServer(port);
 	ApplicationContainer serverApps = echoServer.Install(node);
@@ -179,8 +182,7 @@ void RoutingExperiment::
 	serverApps.Stop(Seconds(endTime));	  // end time in sec
 }
 
-void RoutingExperiment::
-	SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16_t serverPort, double startTime, double endTime)
+void RoutingExperiment::SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16_t serverPort, double startTime, double endTime)
 {
 	UdpEchoClientHelper echoClient(serverIp, serverPort);
 	echoClient.SetAttribute("MaxPackets", UintegerValue(1));
@@ -190,17 +192,22 @@ void RoutingExperiment::
 	clientApps.Start(Seconds(startTime)); // start time in sec
 	clientApps.Stop(Seconds(endTime));	  // end time in sec
 }
-void RoutingExperiment::
-	AddFlows(int nFlows, NodeContainer &adhocNodes)
+void RoutingExperiment::AddFlows(NodeContainer &adhocNodes)
 {
 	int toalNodes = adhocNodes.GetN();
-	for (int i = 0; i < nFlows / 2; i++)
+	for (int i = 0; i < (m_totalFlows +1)/ 2; i++)
 	{
 		int server = rand() % toalNodes;
+		int client = rand() % toalNodes;
+		if(server == client)
+		{
+			i--;
+			continue;
+		}
 		uint16_t port = rand();
 		Ipv4Address serverIp = adhocNodes.Get(server)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
 		SetUpServer(adhocNodes.Get(server), port, 1, 9);
-		int client = rand() % toalNodes;
+		
 		SetUpClient(adhocNodes.Get(client), serverIp, port, 2, 8);
 		NS_LOG_INFO("Flow " << i << ": " << adhocNodes.Get(client)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal() << " -> " << serverIp << ":" << port);
 	}

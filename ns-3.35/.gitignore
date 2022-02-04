@@ -7,6 +7,8 @@
 *.pyc
 *.pyo
 
+*.flowmon
+*.csv
 *.cwnd
 *.dat
 *.log
