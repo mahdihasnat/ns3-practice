@@ -34,10 +34,16 @@ int main(int argc, char *argv[])
 	cmd.AddValue("nodeSpeed", "node speed in m/s", nodeSpeed);
 	cmd.Parse(argc, argv);
 
+	Packet::EnablePrinting();
+	Packet::EnableChecking();
+
+
 	RoutingExperiment experiment(n, nFlows, nodeSpeed);
 	
+
 	// disable hellopacket in all node of routing
 	Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
+
 
 	experiment.Run(simulationTime, new AodvHelper());
 }

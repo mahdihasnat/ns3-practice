@@ -19,7 +19,7 @@ public:
 	int m_totalFlows;
 	double m_nodeSpeed;
 	YansWifiPhyHelper m_wifiPhy;
-
+	Ptr<OutputStreamWrapper> m_tpPerFlowStream ;
 
 	RoutingExperiment(int n, int nFlows, double nodeSpeed)
 	{
@@ -29,6 +29,7 @@ public:
 		NS_LOG_INFO("Total nodes: " << this->m_totalNodes);
 		NS_LOG_INFO("Total flows: " << this->m_totalFlows);
 		NS_LOG_INFO("Node speed: " << this->m_nodeSpeed);
+		m_tpPerFlowStream= Create<OutputStreamWrapper> ("throughput-per-flow.dat", std::ios::out);
 	}
 
 	virtual void AddMobility(NodeContainer &adhocNodes);
