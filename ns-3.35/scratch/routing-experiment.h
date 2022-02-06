@@ -20,6 +20,7 @@ public:
 	double m_nodeSpeed;
 	YansWifiPhyHelper m_wifiPhy;
 
+
 	RoutingExperiment(int n, int nFlows, double nodeSpeed)
 	{
 		this->m_totalNodes = n;
@@ -37,7 +38,7 @@ public:
 	virtual void SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime);
 	virtual void SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16_t serverPort, double startTime, double endTime);
 	void AddFlows(NodeContainer &adhocNodes);
-	void PrintThroughput(FlowMonitorHelper & flowmonHelper,double simulationTime);
+	void PrintThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime);
 
 	void Run(double simulationTime, Ipv4RoutingHelper *routingHelper)
 	{
@@ -55,11 +56,10 @@ public:
 		AnimationInterface anim("manet.xml");
 		anim.EnablePacketMetadata(true);
 		// resize nodes
-		for(int i=0;i<m_totalNodes ; i++)
+		for (int i = 0; i < m_totalNodes; i++)
 		{
 			anim.UpdateNodeSize(i, 10, 10);
 		}
-
 
 		// enable trace generation
 		AsciiTraceHelper ascii;
@@ -117,24 +117,30 @@ RoutingExperiment::AddDevie(NodeContainer &adhocNodes)
 
 	// setting up wifi phy and channel using helpers
 	WifiHelper wifi;
+	
+
+	// https://www.geckoandfly.com/10041/wireless-wifi-802-11-abgn-router-range-and-distance-comparison/
 	wifi.SetStandard(WIFI_STANDARD_80211b);
-
-	YansWifiChannelHelper wifiChannel;
-	wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
-	wifiChannel.AddPropagationLoss("ns3::FriisPropagationLossModel");
-	m_wifiPhy.SetChannel(wifiChannel.Create());
-
-	// Add a mac and disable rate control
-	WifiMacHelper wifiMac;
 	wifi.SetRemoteStationManager("ns3::ConstantRateWifiManager",
 								 "DataMode", StringValue(phyMode),
 								 "ControlMode", StringValue(phyMode));
 
+	YansWifiChannelHelper wifiChannel;
+	wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
+	wifiChannel.AddPropagationLoss("ns3::FriisPropagationLossModel");
+	wifiChannel.AddPropagationLoss("ns3::RangePropagationLossModel", "MaxRange", DoubleValue(140)); // max range of 802.11b
+
+
+	m_wifiPhy.SetChannel(wifiChannel.Create());
 	m_wifiPhy.Set("TxPowerStart", DoubleValue(txp));
 	m_wifiPhy.Set("TxPowerEnd", DoubleValue(txp));
 
+	WifiMacHelper wifiMac;
 	wifiMac.SetType("ns3::AdhocWifiMac");
-	return wifi.Install(m_wifiPhy, wifiMac, adhocNodes);
+
+	NetDeviceContainer adhocDevices = wifi.Install(m_wifiPhy, wifiMac, adhocNodes);
+
+	return adhocDevices;
 }
 
 Ipv4InterfaceContainer
@@ -143,16 +149,16 @@ RoutingExperiment::AssignAddress(NetDeviceContainer &adhocDevices)
 	Ipv4AddressHelper addressAdhoc;
 	addressAdhoc.SetBase("10.1.1.0", "255.255.255.0");
 	Ipv4InterfaceContainer adhocInterfaces;
-	for(int i=0;i<m_totalNodes;i++)
+	for (int i = 0; i < m_totalNodes; i++)
 	{
 		adhocInterfaces.Add(addressAdhoc.Assign(adhocDevices.Get(i)));
 		// addressAdhoc.NewNetwork();
 	}
 
 	// print the IP address
-	for(int i=0;i<m_totalNodes;i++)
+	for (int i = 0; i < m_totalNodes; i++)
 	{
-		NS_LOG_INFO("IP address of node " << i << " is " << adhocInterfaces.GetAddress(i) );
+		NS_LOG_INFO("IP address of node " << i << " is " << adhocInterfaces.GetAddress(i));
 	}
 
 	// return addressAdhoc.Assign(adhocDevices);
@@ -187,25 +193,25 @@ void RoutingExperiment::SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16
 void RoutingExperiment::AddFlows(NodeContainer &adhocNodes)
 {
 	int toalNodes = adhocNodes.GetN();
-	for (int i = 0; i < (m_totalFlows +1)/ 2; i++)
+	for (int i = 0; i < (m_totalFlows + 1) / 2; i++)
 	{
 		int server = rand() % toalNodes;
 		int client = rand() % toalNodes;
-		if(server == client)
+		if (server == client)
 		{
 			i--;
 			continue;
 		}
-		uint16_t port = rand();
+		uint16_t port =  rand();
 		Ipv4Address serverIp = adhocNodes.Get(server)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
 		SetUpServer(adhocNodes.Get(server), port, 1, 9);
-		
+
 		SetUpClient(adhocNodes.Get(client), serverIp, port, 2, 8);
 		NS_LOG_INFO("Flow " << i << ": " << adhocNodes.Get(client)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal() << " -> " << serverIp << ":" << port);
 	}
 }
 
-void RoutingExperiment::PrintThroughput(FlowMonitorHelper &flowmonHelper,double simulationTime)
+void RoutingExperiment::PrintThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime)
 {
 	Ptr<FlowMonitor> flowmon = flowmonHelper.GetMonitor();
 	// get flowclassifier from flowmon object
@@ -213,26 +219,25 @@ void RoutingExperiment::PrintThroughput(FlowMonitorHelper &flowmonHelper,double 
 	NS_ASSERT(classifier != 0);
 
 	// iterator over every flow and print the flow monitor statistics
-	const  FlowMonitor::FlowStatsContainer &stats = flowmon->GetFlowStats();
-	double total_rx = 0;
+	const FlowMonitor::FlowStatsContainer &stats = flowmon->GetFlowStats();
+	long double total_rx = 0;
 	Time start_time = Seconds(simulationTime);
 	Time end_time = Seconds(0);
-	for(FlowMonitor::FlowStatsContainer::const_iterator i=stats.begin(); i!=stats.end(); ++i)
+	for (FlowMonitor::FlowStatsContainer::const_iterator i = stats.begin(); i != stats.end(); ++i)
 	{
 		FlowId flowId = i->first;
 		FlowMonitor::FlowStats fs = i->second;
 		Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(flowId);
-		NS_LOG_INFO("fid: " << flowId << " bytes: " << fs.rxBytes <<" (" << t.sourceAddress << ","<<t.sourcePort<<")->("<< t.destinationAddress<<","<<t.destinationPort<<")");
-		NS_LOG_DEBUG("sent:"<<fs.txBytes<<" received:"<<fs.rxBytes<<" lost:"<<fs.lostPackets);
-		total_rx += fs.rxBytes;
+		NS_LOG_INFO("fid: " << flowId << " bytes: " << fs.rxBytes << " (" << t.sourceAddress << "," << t.sourcePort << ")->(" << t.destinationAddress << "," << t.destinationPort << ")");
 		
-		start_time = min(start_time , fs.timeFirstTxPacket);
-		end_time = max(start_time , fs.timeLastRxPacket);
+		total_rx += fs.rxBytes;
+
+		start_time = min(start_time, fs.timeFirstTxPacket);
+		end_time = max(end_time, fs.timeLastRxPacket);
 	}
 	NS_LOG_INFO("Total Rx: " << total_rx);
 	NS_LOG_INFO("Start time: " << start_time);
 	NS_LOG_INFO("End time: " << end_time);
-	long double throughput = total_rx ? total_rx * 8.0 / (end_time.GetSeconds() - start_time.GetSeconds())/1e6 : 0;
+	long double throughput = total_rx ? total_rx * 8.0 / (end_time.GetSeconds() - start_time.GetSeconds()) / 1e6 : 0;
 	NS_LOG_INFO("Average Throughput: " << throughput << " Mbps");
-
 }
