@@ -14,7 +14,7 @@
 using namespace ns3;
 using namespace std;
 
-// #define ENABLE_PACKET_PRINTING
+#define ENABLE_PACKET_PRINTING
 
 class RoutingExperiment
 {
@@ -24,7 +24,7 @@ public:
 	double m_nodeSpeed;
 	double m_xRange = 300.0;
 	double m_yRange = 900.0;
-	int m_packetRate=10;
+	int m_packetRate = 10;
 	uint32_t m_maxPacketCount = 1;
 
 	YansWifiPhyHelper m_wifiPhy;
@@ -82,7 +82,6 @@ public:
 		this->m_maxPacketCount = maxPacketCount;
 	}
 
-
 	void TxTraceL3(Ptr<const Packet> packet, Ptr<Ipv4> ipv4, uint32_t interface)
 	{
 		m_TxPacketL3++;
@@ -92,7 +91,7 @@ public:
 		NS_LOG_DEBUG("Node " << ipv4->GetObject<Node>()->GetId());
 		NS_LOG_DEBUG("TxTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << " destination " << packet->ToString());
 		NS_LOG_DEBUG("");
-#endif
+#endif 
 	}
 	void RxTraceL3(Ptr<const Packet> packet, Ptr<Ipv4> ipv4, uint32_t interface)
 	{
@@ -157,6 +156,22 @@ public:
 #endif
 	}
 
+	void SendOutgoingTraceL3(const Ipv4Header &header, Ptr<const Packet> packet, uint32_t interface)
+	{
+		#ifdef ENABLE_PACKET_PRINTING
+		NS_LOG_DEBUG("SendOutgoingTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << "  " << packet->ToString());
+		NS_LOG_DEBUG("");
+		#endif
+	}
+
+	void LocalDeliverTraceL3(const Ipv4Header &header, Ptr<const Packet> packet, uint32_t interface)
+	{
+		#ifdef ENABLE_PACKET_PRINTING
+		NS_LOG_DEBUG("LocalDeliverTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << "  " << packet->ToString());
+		NS_LOG_DEBUG("");
+		#endif
+	}
+
 	void Run(double simulationTime, Ipv4RoutingHelper *routingHelper)
 	{
 		NodeContainer adhocNodes;
@@ -194,6 +209,8 @@ public:
 			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Tx", MakeCallback(&RoutingExperiment::TxTraceL3, this));
 			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Rx", MakeCallback(&RoutingExperiment::RxTraceL3, this));
 			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Drop", MakeCallback(&RoutingExperiment::DropTraceL3, this));
+			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("SendOutgoing", MakeCallback(&RoutingExperiment::SendOutgoingTraceL3, this));
+			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("LocalDeliver", MakeCallback(&RoutingExperiment::LocalDeliverTraceL3, this));
 		}
 
 		Simulator::Stop(Seconds(simulationTime));
@@ -340,7 +357,7 @@ void RoutingExperiment::SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16
 {
 	UdpEchoClientHelper echoClient(serverIp, serverPort);
 	echoClient.SetAttribute("MaxPackets", UintegerValue(m_maxPacketCount));
-	echoClient.SetAttribute("Interval", TimeValue(Seconds(m_totalFlows*1.0L / m_packetRate)));
+	echoClient.SetAttribute("Interval", TimeValue(Seconds(m_totalFlows * 1.0L / m_packetRate)));
 	echoClient.SetAttribute("PacketSize", UintegerValue(1024));
 
 	ApplicationContainer clientApps = echoClient.Install(node);
