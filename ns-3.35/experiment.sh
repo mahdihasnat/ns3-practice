@@ -5,7 +5,7 @@ cd ns-3.35
 ./waf -j8 --run "scratch/manet.cc \
 --n=13 \
 --nFlows=10\
---nodeSpeed=100 \
+--nodeSpeed=1 \
 --xRange=200 --yRange=600\
 --packetRate=4 --maxPacketCount=10\
 --simulationTime=100 "

@@ -64,8 +64,8 @@ int main(int argc, char *argv[])
 	uint32_t maxPacketCount = 1;
 
 	LogComponentEnable("manet", LOG_LEVEL_ALL);
-	LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
-	LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
+	// LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
+	// LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
 
 	CommandLine cmd(__FILE__);
 	cmd.AddValue("n", "total nodes in network", n);

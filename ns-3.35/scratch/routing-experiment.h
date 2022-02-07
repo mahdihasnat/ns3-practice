@@ -14,7 +14,7 @@
 using namespace ns3;
 using namespace std;
 
-#define ENABLE_PACKET_PRINTING
+// #define ENABLE_PACKET_PRINTING
 
 class RoutingExperiment
 {
@@ -250,7 +250,7 @@ void RoutingExperiment::AddMobility(NodeContainer &adhocNodes)
 	streamIndex += taPositionAlloc->AssignStreams(streamIndex);
 
 	std::stringstream ssSpeed;
-	ssSpeed << "ns3::UniformRandomVariable[Min=1.0|Max=" << nodeSpeed << "]";
+	ssSpeed << "ns3::UniformRandomVariable[Min=0.0|Max=" << nodeSpeed << "]";
 	std::stringstream ssPause;
 	ssPause << "ns3::ConstantRandomVariable[Constant=" << nodePause << "]";
 
@@ -358,7 +358,7 @@ void RoutingExperiment::SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16
 	UdpEchoClientHelper echoClient(serverIp, serverPort);
 	echoClient.SetAttribute("MaxPackets", UintegerValue(m_maxPacketCount));
 	echoClient.SetAttribute("Interval", TimeValue(Seconds(m_totalFlows * 1.0L / m_packetRate)));
-	echoClient.SetAttribute("PacketSize", UintegerValue(1024));
+	echoClient.SetAttribute("PacketSize", UintegerValue(100));
 
 	ApplicationContainer clientApps = echoClient.Install(node);
 	clientApps.Get(0)->TraceConnectWithoutContext("Tx", MakeCallback(&TxTraceL4));
@@ -377,7 +377,7 @@ void RoutingExperiment::AddFlows(NodeContainer &adhocNodes)
 			i--;
 			continue;
 		}
-		uint16_t port = rand();
+		uint16_t port = rand() | 0x8000;
 		Ipv4Address serverIp = adhocNodes.Get(server)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
 		SetUpServer(adhocNodes.Get(server), port, 1, 100);
 
@@ -403,6 +403,9 @@ void RoutingExperiment::CalculateThroughput(FlowMonitorHelper &flowmonHelper, do
 		FlowId flowId = i->first;
 		FlowMonitor::FlowStats fs = i->second;
 		Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(flowId);
+
+		if(t.destinationPort == 654) continue;
+		if(t.sourcePort == 654) continue;
 
 		ostringstream oss;
 		oss << "(" << t.sourceAddress << "," << t.sourcePort << ")->(" << t.destinationAddress << "," << t.destinationPort << ")";
