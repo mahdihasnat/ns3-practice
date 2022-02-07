@@ -15,6 +15,41 @@ NS_LOG_COMPONENT_DEFINE("manet");
 using namespace ns3;
 using namespace std;
 
+
+class Test1 : public RoutingExperiment
+{
+public:
+	Test1(int n, int nFlows, double nodeSpeed): RoutingExperiment(n, nFlows, nodeSpeed)
+	{
+	}
+	void AddMobility(NodeContainer &nodes)
+	{
+		NS_ASSERT(nodes.GetN() == 3);
+		// set nodes[0] to (0,0) constant position
+		Ptr<ConstantPositionMobilityModel> mob = CreateObject<ConstantPositionMobilityModel>();
+		mob->SetPosition(Vector(0,0,0));
+		nodes.Get(0)->AggregateObject(mob);
+		// set nodes[1] to (100,0) constant position
+		mob = CreateObject<ConstantPositionMobilityModel>();
+		mob->SetPosition(Vector(100,0,0));
+		nodes.Get(1)->AggregateObject(mob);
+		// set nodes[2] to (200,20) constant position
+		mob = CreateObject<ConstantPositionMobilityModel>();
+		mob->SetPosition(Vector(200,20,0));
+		nodes.Get(2)->AggregateObject(mob);
+
+	}
+	void AddFlows(NodeContainer &adhocNodes)
+	{
+		NS_ASSERT(adhocNodes.GetN() == 3);
+		// Add flows from nodes[0] to nodes[2]
+		SetUpServer(adhocNodes.Get(0), 9,1,99);
+		Ipv4Address serverIp = adhocNodes.Get(0)->GetObject<Ipv4>()->GetAddress(1,0).GetLocal();
+		SetUpClient(adhocNodes.Get(2), serverIp, 9,2,98);
+
+	}
+};
+
 int main(int argc, char *argv[])
 {
 
@@ -23,6 +58,10 @@ int main(int argc, char *argv[])
 	// int packetRate=10; // number of packet per sec
 	double nodeSpeed = 20;		   // in m/s
 	double simulationTime = 100.0; // in s
+	double xRange = 300.0;
+	double yRange = 900.0;
+	int packetRate = 10; // packets per sec
+	uint32_t maxPacketCount = 1;
 
 	LogComponentEnable("manet", LOG_LEVEL_ALL);
 	LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
@@ -32,6 +71,11 @@ int main(int argc, char *argv[])
 	cmd.AddValue("n", "total nodes in network", n);
 	cmd.AddValue("nFlows", "number of flows", nFlows);
 	cmd.AddValue("nodeSpeed", "node speed in m/s", nodeSpeed);
+	cmd.AddValue("simulationTime", "simulation time in s", simulationTime);
+	cmd.AddValue("xRange", "x axis range", xRange);
+	cmd.AddValue("yRange", "y axis range", yRange);
+	cmd.AddValue("packetRate", "packet rate", packetRate);
+	cmd.AddValue("maxPacketCount", "max packet count", maxPacketCount);
 	cmd.Parse(argc, argv);
 
 	Packet::EnablePrinting();
@@ -39,13 +83,15 @@ int main(int argc, char *argv[])
 
 
 	RoutingExperiment experiment(n, nFlows, nodeSpeed);
-	
+	experiment.setXRange(xRange);
+	experiment.setYRange(yRange);
+	experiment.setPacketRate(packetRate);
+	experiment.setMaxPacketCount(maxPacketCount);
 
 	// disable hellopacket in all node of routing
 	Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
-
-
 	experiment.Run(simulationTime, new AodvHelper());
+
 }
 
 

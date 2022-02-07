@@ -6,11 +6,15 @@
 #include "ns3/mobility-module.h"
 #include "ns3/netanim-module.h"
 #include "ns3/flow-monitor-module.h"
+#include "ns3/network-module.h"
+#include "ns3/ipv4-l3-protocol.h"
 
 // NS_LOG_COMPONENT_DEFINE("manet");
 
 using namespace ns3;
 using namespace std;
+
+// #define ENABLE_PACKET_PRINTING
 
 class RoutingExperiment
 {
@@ -18,8 +22,20 @@ public:
 	int m_totalNodes;
 	int m_totalFlows;
 	double m_nodeSpeed;
+	double m_xRange = 300.0;
+	double m_yRange = 900.0;
+	int m_packetRate=10;
+	uint32_t m_maxPacketCount = 1;
+
 	YansWifiPhyHelper m_wifiPhy;
-	Ptr<OutputStreamWrapper> m_tpPerFlowStream ;
+	Ptr<OutputStreamWrapper> m_tpPerFlowStream;
+	Ptr<OutputStreamWrapper> m_ipv4Stream;
+	uint128_t m_TxPacketL3 = 0;
+	uint128_t m_RxPacketL3 = 0;
+	uint128_t m_DropPacketL3 = 0;
+	uint128_t m_TxPacketSizeL3 = 0;
+	uint128_t m_RxPacketSizeL3 = 0;
+	uint128_t m_DropPacketSizeL3 = 0;
 
 	RoutingExperiment(int n, int nFlows, double nodeSpeed)
 	{
@@ -29,7 +45,8 @@ public:
 		NS_LOG_INFO("Total nodes: " << this->m_totalNodes);
 		NS_LOG_INFO("Total flows: " << this->m_totalFlows);
 		NS_LOG_INFO("Node speed: " << this->m_nodeSpeed);
-		m_tpPerFlowStream= Create<OutputStreamWrapper> ("throughput-per-flow.dat", std::ios::out);
+		m_tpPerFlowStream = Create<OutputStreamWrapper>("throughput-per-flow.dat", std::ios::out);
+		m_ipv4Stream = Create<OutputStreamWrapper>("manet-ipv4.tr", std::ios::out);
 	}
 
 	virtual void AddMobility(NodeContainer &adhocNodes);
@@ -38,8 +55,107 @@ public:
 	void InstallInternetStack(NodeContainer &adhocNodes, Ipv4RoutingHelper *routingHelper);
 	virtual void SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime);
 	virtual void SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16_t serverPort, double startTime, double endTime);
-	void AddFlows(NodeContainer &adhocNodes);
-	void PrintThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime);
+	virtual void AddFlows(NodeContainer &adhocNodes);
+	void CalculateThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime);
+	long double PacketDeliveryRatioL3()
+	{
+		return (long double)m_RxPacketL3 * 100.0L / (long double)m_TxPacketL3;
+	}
+	long double PacketDropRatioL3()
+	{
+		return (long double)m_DropPacketL3 * 100.0L / (long double)m_TxPacketL3;
+	}
+	void setXRange(double xRange)
+	{
+		this->m_xRange = xRange;
+	}
+	void setYRange(double yRange)
+	{
+		this->m_yRange = yRange;
+	}
+	void setPacketRate(int packetRate)
+	{
+		this->m_packetRate = packetRate;
+	}
+	void setMaxPacketCount(uint32_t maxPacketCount)
+	{
+		this->m_maxPacketCount = maxPacketCount;
+	}
+
+
+	void TxTraceL3(Ptr<const Packet> packet, Ptr<Ipv4> ipv4, uint32_t interface)
+	{
+		m_TxPacketL3++;
+		m_TxPacketSizeL3 += packet->GetSize();
+
+#ifdef ENABLE_PACKET_PRINTING
+		NS_LOG_DEBUG("Node " << ipv4->GetObject<Node>()->GetId());
+		NS_LOG_DEBUG("TxTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << " destination " << packet->ToString());
+		NS_LOG_DEBUG("");
+#endif
+	}
+	void RxTraceL3(Ptr<const Packet> packet, Ptr<Ipv4> ipv4, uint32_t interface)
+	{
+		m_RxPacketL3++;
+		m_RxPacketSizeL3 += packet->GetSize();
+
+#ifdef ENABLE_PACKET_PRINTING
+		NS_LOG_DEBUG("Node " << ipv4->GetObject<Node>()->GetId());
+		NS_LOG_DEBUG("RxTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << " destination " << packet->ToString());
+		NS_LOG_DEBUG("");
+#endif
+	}
+	void DropTraceL3(const Ipv4Header &header, Ptr<const Packet> packet, Ipv4L3Protocol::DropReason reason, Ptr<Ipv4> ipv4, uint32_t interface)
+	{
+		m_DropPacketL3++;
+		m_DropPacketSizeL3 += packet->GetSize();
+
+#ifdef ENABLE_PACKET_PRINTING
+		NS_LOG_DEBUG("Node " << ipv4->GetObject<Node>()->GetId());
+		NS_LOG_DEBUG("DropTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << " destination " << packet->ToString());
+
+		// enum DropReason
+		// {
+		// 	DROP_TTL_EXPIRED = 1,   /**< Packet TTL has expired */
+		// 	DROP_NO_ROUTE,   /**< No route to host */
+		// 	DROP_BAD_CHECKSUM,   /**< Bad checksum */
+		// 	DROP_INTERFACE_DOWN,   /**< Interface is down so can not send packet */
+		// 	DROP_ROUTE_ERROR,   /**< Route error */
+		// 	DROP_FRAGMENT_TIMEOUT, /**< Fragment timeout exceeded */
+		// 	DROP_DUPLICATE  /**< Duplicate packet received */
+		// };
+
+		switch (reason)
+		{
+		case Ipv4L3Protocol::DropReason::DROP_TTL_EXPIRED:
+			NS_LOG_DEBUG("DROP_TTL_EXPIRED");
+			break;
+		case Ipv4L3Protocol::DropReason::DROP_NO_ROUTE:
+			NS_LOG_DEBUG("DROP_NO_ROUTE");
+			break;
+		case Ipv4L3Protocol::DropReason::DROP_BAD_CHECKSUM:
+			NS_LOG_DEBUG("DROP_BAD_CHECKSUM");
+			break;
+		case Ipv4L3Protocol::DropReason::DROP_INTERFACE_DOWN:
+			NS_LOG_DEBUG("DROP_INTERFACE_DOWN");
+			break;
+		case Ipv4L3Protocol::DropReason::DROP_ROUTE_ERROR:
+			NS_LOG_DEBUG("DROP_ROUTE_ERROR");
+			break;
+		case Ipv4L3Protocol::DropReason::DROP_FRAGMENT_TIMEOUT:
+			NS_LOG_DEBUG("DROP_FRAGMENT_TIMEOUT");
+			break;
+		case Ipv4L3Protocol::DropReason::DROP_DUPLICATE:
+			NS_LOG_DEBUG("DROP_DUPLICATE");
+			break;
+		default:
+			NS_LOG_DEBUG("Unknown");
+			break;
+		}
+
+		NS_LOG_DEBUG("");
+#endif
+	}
 
 	void Run(double simulationTime, Ipv4RoutingHelper *routingHelper)
 	{
@@ -72,13 +188,26 @@ public:
 		FlowMonitorHelper flowmonHelper;
 		flowmon = flowmonHelper.InstallAll();
 
+		// add TraceL3 to all nodes
+		for (int i = 0; i < m_totalNodes; i++)
+		{
+			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Tx", MakeCallback(&RoutingExperiment::TxTraceL3, this));
+			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Rx", MakeCallback(&RoutingExperiment::RxTraceL3, this));
+			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Drop", MakeCallback(&RoutingExperiment::DropTraceL3, this));
+		}
+
 		Simulator::Stop(Seconds(simulationTime));
 		Simulator::Run();
 		Simulator::Destroy();
 
-		PrintThroughput(flowmonHelper, simulationTime);
+		CalculateThroughput(flowmonHelper, simulationTime);
 		flowmon->SerializeToXmlFile("manet.flowmon", true, true);
-		
+
+		NS_LOG_INFO("Total packets sent: " << (long long)m_TxPacketL3);
+		NS_LOG_INFO("Total packets received: " << (long long)m_RxPacketL3);
+		NS_LOG_INFO("Total packets dropped: " << (long long)m_DropPacketL3);
+		NS_LOG_INFO("Packet Delivery Ratio (L3): " << PacketDeliveryRatioL3() << "%");
+		NS_LOG_INFO("Packet Drop Ratio (L3): " << PacketDropRatioL3() << "%");
 	}
 };
 
@@ -86,16 +215,25 @@ void RoutingExperiment::AddMobility(NodeContainer &adhocNodes)
 {
 	double nodeSpeed = m_nodeSpeed; //  in m/s , default=20
 	double nodePause = 0;			// in s
+	int64_t streamIndex = 0;		// used to get consistent mobility across scenarios
 
 	ObjectFactory pos;
 	pos.SetTypeId("ns3::RandomRectanglePositionAllocator");
-	pos.Set("X", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=100.0]"));
-	pos.Set("Y", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=100.0]"));
+
+	ostringstream ossX;
+	ossX << "ns3::UniformRandomVariable[Min=0.0|Max=" << m_xRange << "]";
+
+	ostringstream ossY;
+	ossY << "ns3::UniformRandomVariable[Min=0.0|Max=" << m_yRange << "]";
+
+	pos.Set("X", StringValue(ossX.str()));
+	pos.Set("Y", StringValue(ossY.str()));
 
 	Ptr<PositionAllocator> taPositionAlloc = pos.Create()->GetObject<PositionAllocator>();
+	streamIndex += taPositionAlloc->AssignStreams(streamIndex);
 
 	std::stringstream ssSpeed;
-	ssSpeed << "ns3::UniformRandomVariable[Min=0.0|Max=" << nodeSpeed << "]";
+	ssSpeed << "ns3::UniformRandomVariable[Min=1.0|Max=" << nodeSpeed << "]";
 	std::stringstream ssPause;
 	ssPause << "ns3::ConstantRandomVariable[Constant=" << nodePause << "]";
 
@@ -106,6 +244,9 @@ void RoutingExperiment::AddMobility(NodeContainer &adhocNodes)
 								   "PositionAllocator", PointerValue(taPositionAlloc));
 	mobilityAdhoc.SetPositionAllocator(taPositionAlloc);
 	mobilityAdhoc.Install(adhocNodes);
+
+	streamIndex += mobilityAdhoc.AssignStreams(adhocNodes, streamIndex);
+	NS_UNUSED(streamIndex); // From this point, streamIndex is unused
 }
 
 NetDeviceContainer
@@ -118,7 +259,6 @@ RoutingExperiment::AddDevie(NodeContainer &adhocNodes)
 
 	// setting up wifi phy and channel using helpers
 	WifiHelper wifi;
-	
 
 	// https://www.geckoandfly.com/10041/wireless-wifi-802-11-abgn-router-range-and-distance-comparison/
 	wifi.SetStandard(WIFI_STANDARD_80211b);
@@ -130,7 +270,8 @@ RoutingExperiment::AddDevie(NodeContainer &adhocNodes)
 	wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
 	wifiChannel.AddPropagationLoss("ns3::FriisPropagationLossModel");
 	wifiChannel.AddPropagationLoss("ns3::RangePropagationLossModel", "MaxRange", DoubleValue(140)); // max range of 802.11b
-
+	// nakagami propagation loss model
+	wifiChannel.AddPropagationLoss("ns3::NakagamiPropagationLossModel");
 
 	m_wifiPhy.SetChannel(wifiChannel.Create());
 	m_wifiPhy.Set("TxPowerStart", DoubleValue(txp));
@@ -148,7 +289,7 @@ Ipv4InterfaceContainer
 RoutingExperiment::AssignAddress(NetDeviceContainer &adhocDevices)
 {
 	Ipv4AddressHelper addressAdhoc;
-	addressAdhoc.SetBase("10.1.1.0", "255.255.255.0");
+	addressAdhoc.SetBase("10.0.0.0", "255.0.0.0");
 	Ipv4InterfaceContainer adhocInterfaces;
 	for (int i = 0; i < m_totalNodes; i++)
 	{
@@ -171,6 +312,7 @@ void RoutingExperiment::InstallInternetStack(NodeContainer &adhocNodes, Ipv4Rout
 	InternetStackHelper internet;
 	internet.SetRoutingHelper(*routingHelper);
 	internet.Install(adhocNodes);
+	internet.EnableAsciiIpv4All(m_ipv4Stream);
 }
 
 void RoutingExperiment::SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime)
@@ -181,13 +323,28 @@ void RoutingExperiment::SetUpServer(Ptr<Node> node, uint16_t port, double startT
 	serverApps.Stop(Seconds(endTime));	  // end time in sec
 }
 
+void TxTraceL4(Ptr<const Packet> p)
+{
+#ifdef ENABLE_PACKET_PRINTING
+	NS_LOG_DEBUG("Packet sent at " << Simulator::Now().GetSeconds() << " : " << p->ToString());
+	ostringstream oss;
+	p->Print(oss);
+	oss << "\n";
+	p->PrintPacketTags(oss);
+	oss << "\n\n";
+	NS_LOG_DEBUG(oss.str());
+#endif
+}
+
 void RoutingExperiment::SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16_t serverPort, double startTime, double endTime)
 {
 	UdpEchoClientHelper echoClient(serverIp, serverPort);
-	echoClient.SetAttribute("MaxPackets", UintegerValue(1));
-	echoClient.SetAttribute("Interval", TimeValue(Seconds(0.1)));
-	echoClient.SetAttribute("PacketSize", UintegerValue(2000));
+	echoClient.SetAttribute("MaxPackets", UintegerValue(m_maxPacketCount));
+	echoClient.SetAttribute("Interval", TimeValue(Seconds(m_totalFlows*1.0L / m_packetRate)));
+	echoClient.SetAttribute("PacketSize", UintegerValue(1024));
+
 	ApplicationContainer clientApps = echoClient.Install(node);
+	clientApps.Get(0)->TraceConnectWithoutContext("Tx", MakeCallback(&TxTraceL4));
 	clientApps.Start(Seconds(startTime)); // start time in sec
 	clientApps.Stop(Seconds(endTime));	  // end time in sec
 }
@@ -203,16 +360,16 @@ void RoutingExperiment::AddFlows(NodeContainer &adhocNodes)
 			i--;
 			continue;
 		}
-		uint16_t port =  rand();
+		uint16_t port = rand();
 		Ipv4Address serverIp = adhocNodes.Get(server)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
-		SetUpServer(adhocNodes.Get(server), port, 1, 9);
+		SetUpServer(adhocNodes.Get(server), port, 1, 100);
 
-		SetUpClient(adhocNodes.Get(client), serverIp, port, 2, 8);
+		SetUpClient(adhocNodes.Get(client), serverIp, port, 2, 99);
 		NS_LOG_INFO("Flow " << i << ": " << adhocNodes.Get(client)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal() << " -> " << serverIp << ":" << port);
 	}
 }
 
-void RoutingExperiment::PrintThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime)
+void RoutingExperiment::CalculateThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime)
 {
 	Ptr<FlowMonitor> flowmon = flowmonHelper.GetMonitor();
 	// get flowclassifier from flowmon object
@@ -229,8 +386,18 @@ void RoutingExperiment::PrintThroughput(FlowMonitorHelper &flowmonHelper, double
 		FlowId flowId = i->first;
 		FlowMonitor::FlowStats fs = i->second;
 		Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(flowId);
+
+		ostringstream oss;
+		oss << "(" << t.sourceAddress << "," << t.sourcePort << ")->(" << t.destinationAddress << "," << t.destinationPort << ")";
+		string flowDesc = oss.str();
+
+		long double throuputPerFlow = fs.rxBytes ? (fs.rxBytes * 8.0 / (fs.timeLastRxPacket.GetSeconds() - fs.timeFirstTxPacket.GetSeconds())) / 1e6 : 0; // in Mbps
+
+		(*m_tpPerFlowStream->GetStream()) << flowDesc << "\t" << throuputPerFlow << "\n";
+
 		NS_LOG_INFO("fid: " << flowId << " bytes: " << fs.rxBytes << " (" << t.sourceAddress << "," << t.sourcePort << ")->(" << t.destinationAddress << "," << t.destinationPort << ")");
-		
+		// NS_LOG_INFO("start time: " << fs.timeFirstTxPacket.GetSeconds() << " end time: " << fs.timeLastRxPacket.GetSeconds() << " duration: " << fs.timeLastRxPacket.GetSeconds() - fs.timeFirstTxPacket.GetSeconds());
+
 		total_rx += fs.rxBytes;
 
 		start_time = min(start_time, fs.timeFirstTxPacket);
