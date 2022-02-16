@@ -11,6 +11,8 @@
 NS_LOG_COMPONENT_DEFINE("manet");
 
 #include "routing-experiment.h"
+#include "ns3/tora-module.h"
+#include "ns3/rip-helper.h"
 
 using namespace ns3;
 using namespace std;
@@ -64,6 +66,9 @@ int main(int argc, char *argv[])
 	uint32_t maxPacketCount = 1;
 
 	LogComponentEnable("manet", LOG_LEVEL_ALL);
+	LogComponentEnable("ToraRoutingProtocol", LOG_LEVEL_ALL);
+	LogComponentEnable("AodvRoutingProtocol", LOG_PREFIX_FUNC);
+	
 	// LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
 	// LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
 
@@ -90,7 +95,9 @@ int main(int argc, char *argv[])
 
 	// disable hellopacket in all node of routing
 	Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
-	experiment.Run(simulationTime, new AodvHelper());
+	Ipv4RoutingHelper * routing = new AodvHelper();
+	experiment.Run(simulationTime, routing);
+	delete routing;
 
 }
 

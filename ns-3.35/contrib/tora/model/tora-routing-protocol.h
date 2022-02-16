@@ -4,6 +4,7 @@
 #define TORAROUTINGPROTOCOL_H
 
 #include "ns3/ipv4-routing-protocol.h"
+#include "ns3/random-variable-stream.h"
 
 namespace ns3 {
 
@@ -41,6 +42,23 @@ public:
   virtual void SetIpv4 (Ptr<Ipv4> ipv4);
   virtual void PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit unit = Time::S) const;
 
+  /**
+   * Assign a fixed random variable stream number to the random variables
+   * used by this model.  Return the number of streams (possibly zero) that
+   * have been assigned.
+   *
+   * \param stream first stream index to use
+   * \return the number of stream indices assigned by this model
+   */
+  int64_t AssignStreams (int64_t stream);
+
+  private:
+
+  /// IP protocol
+  Ptr<Ipv4> m_ipv4;
+
+  /// Provides uniform random variables.
+  Ptr<UniformRandomVariable> m_uniformRandomVariable;
 
 };
 
