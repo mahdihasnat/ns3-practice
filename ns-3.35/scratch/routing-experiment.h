@@ -9,7 +9,6 @@
 #include "ns3/network-module.h"
 #include "ns3/ipv4-l3-protocol.h"
 
-// NS_LOG_COMPONENT_DEFINE("manet");
 
 using namespace ns3;
 using namespace std;
@@ -36,6 +35,9 @@ public:
 	uint128_t m_TxPacketSizeL3 = 0;
 	uint128_t m_RxPacketSizeL3 = 0;
 	uint128_t m_DropPacketSizeL3 = 0;
+	map<uint64_t,Time> m_TxTimeOfPacket;
+	Time m_TotalEnd2EndDelay = Seconds(0);
+	uint128_t m_TotalLocalDeliveredL3Packet = 0;
 
 	RoutingExperiment(int n, int nFlows, double nodeSpeed)
 	{
@@ -158,18 +160,30 @@ public:
 
 	void SendOutgoingTraceL3(const Ipv4Header &header, Ptr<const Packet> packet, uint32_t interface)
 	{
+		
 		#ifdef ENABLE_PACKET_PRINTING
-		NS_LOG_DEBUG("SendOutgoingTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << "  " << packet->ToString());
+		NS_LOG_DEBUG("SendOutgoingTraceL3 at " << Simulator::Now().GetSeconds()
+		 << " size " << packet->GetSize() << "  " << packet->ToString()<<"\n"<<packet->GetUid());
 		NS_LOG_DEBUG("");
 		#endif
+		NS_ASSERT(m_TxTimeOfPacket.find(packet->GetUid()) == m_TxTimeOfPacket.end());
+		m_TxTimeOfPacket[packet->GetUid()] = Simulator::Now();
 	}
 
 	void LocalDeliverTraceL3(const Ipv4Header &header, Ptr<const Packet> packet, uint32_t interface)
 	{
+		
 		#ifdef ENABLE_PACKET_PRINTING
-		NS_LOG_DEBUG("LocalDeliverTraceL3 at " << Simulator::Now() << " size " << packet->GetSize() << "  " << packet->ToString());
+		NS_LOG_DEBUG("LocalDeliverTraceL3 at " << Simulator::Now().GetSeconds()
+		 << " size " << packet->GetSize() << "  " << packet->ToString()<<
+		 "\n"<<packet->GetUid()
+		 );
 		NS_LOG_DEBUG("");
 		#endif
+		// NS_ASSERT(m_TxTimeOfPacket.find(packet->GetUid()) != m_TxTimeOfPacket.end());
+		m_TotalEnd2EndDelay += Simulator::Now() - m_TxTimeOfPacket[packet->GetUid()];
+		m_TxTimeOfPacket.erase(packet->GetUid());
+		m_TotalLocalDeliveredL3Packet++;
 	}
 
 	void Run(double simulationTime, Ipv4RoutingHelper *routingHelper)
@@ -225,6 +239,7 @@ public:
 		NS_LOG_INFO("Total packets dropped: " << (long long)m_DropPacketL3);
 		NS_LOG_INFO("Packet Delivery Ratio (L3): " << PacketDeliveryRatioL3() << "%");
 		NS_LOG_INFO("Packet Drop Ratio (L3): " << PacketDropRatioL3() << "%");
+		NS_LOG_INFO("Average end-to-end delay: " << m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet << "s");
 	}
 };
 
