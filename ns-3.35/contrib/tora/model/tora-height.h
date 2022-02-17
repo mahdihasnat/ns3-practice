@@ -9,6 +9,16 @@ namespace ns3
 namespace tora
 {
 /**
+ * HEIGHT.tau   Time the reference level was created.
+ * 
+ * HEIGHT.oid   Unique id of the router that created the reference level.
+ * 
+ * HEIGHT.r     Flag indicating if it is a reflected reference level.
+ * 
+ * HEIGHT.delta Value used in propagation of a reference level.
+ * 
+ * HEIGHT.id    Unique id of the router to which the height metric refers.
+ * 
  * @brief Height metrics for TORA nodes. according tora rfc draft revision 04
  * @author Mahdi Hasnat Siyam
  * @cite tora rfc https://www.ietf.org/archive/id/draft-ietf-manet-tora-spec-04.txt
@@ -25,6 +35,9 @@ private:
 public:
 	Height (Time tao , uint32_t oid , bool r , uint32_t delta , uint32_t i);
 	virtual ~Height ();
+
+	static Height GetNullHeight(uint16_t i);
+
 	Time GetTao () const;
 	uint32_t GetOid () const;
 	bool GetR () const;

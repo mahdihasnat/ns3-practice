@@ -21,6 +21,13 @@ Height::~Height()
 	NS_LOG_FUNCTION (this);
 }
 
+Height 
+Height::GetNullHeight(uint16_t i)
+{
+	static Height h (Seconds (-1), 0, false, 0, i);
+	return h;
+}
+
 Time
 Height::GetTao() const
 {
