@@ -36,15 +36,17 @@ public:
 	Height (Time tao , uint32_t oid , bool r , uint32_t delta , uint32_t i);
 	virtual ~Height ();
 
-	static Height GetNullHeight(uint16_t i);
+	static Height GetNullHeight(uint32_t i);
+	static Height GetZeroHeight(uint32_t i);
 
 	Time GetTao () const;
 	uint32_t GetOid () const;
 	bool GetR () const;
 	uint32_t GetDelta () const;
 	uint32_t GetI () const;
-	bool operator< (const Height &h) const;
+	bool operator <  (const Height &h) const;
 	bool operator == (const Height &h) const;
+	bool operator != (const Height &h) const;
 };
 
 

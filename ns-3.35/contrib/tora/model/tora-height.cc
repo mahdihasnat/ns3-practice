@@ -22,9 +22,16 @@ Height::~Height()
 }
 
 Height 
-Height::GetNullHeight(uint16_t i)
+Height::GetNullHeight(uint32_t i)
 {
-	static Height h (Seconds (-1), 0, false, 0, i);
+	static Height h (Seconds(-1), 0, false, 0, i);
+	return h;
+}
+
+Height 
+Height::GetZeroHeight(uint32_t i)
+{
+	static Height h (Seconds (0), 0, false, 0, i);
 	return h;
 }
 
@@ -76,4 +83,10 @@ Height:: operator==(Height const &h) const
 			m_r == h.GetR() && 
 			m_delta == h.GetDelta() &&
 	 		m_i == h.GetI();
+}
+
+bool
+Height:: operator!=(Height const &h) const
+{
+	return !(*this == h);
 }
