@@ -29,8 +29,8 @@ import wutils
 # By default, all modules will be enabled, examples will be disabled,
 # and tests will be disabled.
 modules_enabled  = ['all_modules']
-examples_enabled = False
-tests_enabled    = False
+examples_enabled = True
+tests_enabled    = True
 
 # GCC minimum version requirements for C++17 support
 gcc_min_version = (7, 0, 0)

@@ -6,9 +6,12 @@
 // An essential include is test.h
 #include "ns3/test.h"
 
+#include "ns3/tora-packet.h"
+
 // Do not put your test classes in namespace ns3.  You may find it useful
 // to use the using directive to access the ns3 namespace directly
 using namespace ns3;
+using namespace tora;
 
 // This is an example TestCase.
 class ToraTestCase1 : public TestCase
@@ -46,6 +49,32 @@ ToraTestCase1::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ_TOL (0.01, 0.01, 0.001, "Numbers are not equal within tolerance");
 }
 
+
+struct QryHeaderTest : public TestCase
+{
+  QryHeaderTest ():TestCase("TORA QRY")
+  {
+
+  }
+  virtual void DoRun (void)
+  {
+    QryHeader h(Ipv4Address("10.20.30.40"));
+    NS_TEST_ASSERT_MSG_EQ(h.GetDst(), Ipv4Address("10.20.30.40"), "trivial");
+
+    h.SetDst(Ipv4Address("255.0.12.17"));
+    NS_TEST_ASSERT_MSG_EQ(h.GetDst(), Ipv4Address("255.0.12.17"), "trivial");
+
+    Ptr<Packet>p = Create<Packet>();
+    p->AddHeader(h);
+    QryHeader h2;
+    uint32_t bytes = p->RemoveHeader(h2);
+    NS_TEST_ASSERT_MSG_EQ (bytes, 8, "Qry is 8 byts long");
+    NS_TEST_ASSERT_MSG_EQ (h2.GetDst(), Ipv4Address("255.0.12.17") ,"Round trip serialization works"); 
+
+  }
+};
+
+
 // The TestSuite class names the TestSuite, identifies what type of TestSuite,
 // and enables the TestCases to be run.  Typically, only the constructor for
 // this class must be defined
@@ -61,6 +90,7 @@ ToraTestSuite::ToraTestSuite ()
 {
   // TestDuration for TestCase can be QUICK, EXTENSIVE or TAKES_FOREVER
   AddTestCase (new ToraTestCase1, TestCase::QUICK);
+  AddTestCase (new QryHeaderTest, TestCase::QUICK);
 }
 
 // Do not forget to allocate an instance of this TestSuite
