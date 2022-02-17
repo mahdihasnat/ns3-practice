@@ -2,13 +2,13 @@
 #!/bin/bash
 # Path: ns-3.35/experiment.sh
 cd ns-3.35
-./waf -j8 --run "scratch/manet.cc \
+./waf -j8 --run "scratch/manet \
 --n=2 \
---nFlows=2\
+--nFlows=2 \
 --nodeSpeed=0.0001 \
---xRange=200 --yRange=600\
---packetRate=4 --maxPacketCount=1\
---simulationTime=100 "  \
+--simulationTime=12.2 \
+--xRange=200 --yRange=600 \
+--packetRate=4 --maxPacketCount=1" \
 NS_LOG="AodvRoutingProtocol=all|prefix_node|prefix_time|prefix_func:\
 UdpEchoClientApplication=level_info|prefix_func:\
 UdpEchoServerApplication=level_info|prefix_func"

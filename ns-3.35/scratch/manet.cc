@@ -13,6 +13,7 @@ NS_LOG_COMPONENT_DEFINE("manet");
 #include "routing-experiment.h"
 #include "ns3/tora-module.h"
 #include "ns3/rip-helper.h"
+#include "ns3/dsr-module.h"
 
 using namespace ns3;
 using namespace std;
@@ -82,6 +83,15 @@ int main(int argc, char *argv[])
 	cmd.AddValue("packetRate", "packet rate", packetRate);
 	cmd.AddValue("maxPacketCount", "max packet count", maxPacketCount);
 	cmd.Parse(argc, argv);
+
+	NS_LOG_DEBUG("n = " << n);
+	NS_LOG_DEBUG("nFlows = " << nFlows);
+	NS_LOG_DEBUG("nodeSpeed = " << nodeSpeed);
+	NS_LOG_DEBUG("simulationTime " << simulationTime);
+	NS_LOG_DEBUG("xRange " << xRange);
+	NS_LOG_DEBUG("yRange " << yRange);
+	NS_LOG_DEBUG("packetRate " << packetRate);
+	NS_LOG_DEBUG("maxPacketCount " << maxPacketCount);
 
 	Packet::EnablePrinting();
 	Packet::EnableChecking();
