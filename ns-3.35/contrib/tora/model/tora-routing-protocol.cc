@@ -3,6 +3,7 @@
 #include "tora-routing-protocol.h"
 #include "ns3/core-module.h"
 #include "ns3/ipv4-routing-protocol.h"
+#include "ns3/node.h"
 
 namespace ns3{
 
@@ -49,6 +50,12 @@ RoutingProtocol::SetIpv4 (Ptr<Ipv4> ipv4)
 {
 	NS_LOG_FUNCTION (this << ipv4);
 	m_ipv4 = ipv4;
+}
+
+uint32_t
+RoutingProtocol::GetRouterId (void) const
+{
+	return m_ipv4->GetObject<Node>()->GetId();
 }
 
 void

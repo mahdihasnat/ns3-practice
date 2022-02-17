@@ -9,7 +9,7 @@ cd ns-3.35
 --xRange=200 --yRange=600\
 --packetRate=4 --maxPacketCount=1\
 --simulationTime=100 "  \
-NS_LOG="AodvRoutingProtocol=error:\
+NS_LOG="AodvRoutingProtocol=all|prefix_node|prefix_time|prefix_func:\
 UdpEchoClientApplication=level_info|prefix_func:\
 UdpEchoServerApplication=level_info|prefix_func"
 # RipHeader=all|prefix_func:\

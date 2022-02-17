@@ -52,8 +52,15 @@ public:
    */
   int64_t AssignStreams (int64_t stream);
 
-  private:
-
+private:
+  /**
+   * Get unique id for all routiers in network
+   * @brief Get the Router Id object
+   * 
+   * @return uint32_t 
+   */
+  uint32_t GetRouterId(void) const;
+  
   /// IP protocol
   Ptr<Ipv4> m_ipv4;
 

@@ -10,6 +10,7 @@ def build(bld):
     module = bld.create_ns3_module('tora', ['core','internet'])
     module.source = [
         'model/tora.cc',
+        'model/tora-height.cc',
         'model/tora-routing-protocol.cc',
         'helper/tora-helper.cc',
         ]
@@ -28,6 +29,7 @@ def build(bld):
     headers.module = 'tora'
     headers.source = [
         'model/tora.h',
+        'model/tora-height.h',
         'model/tora-routing-protocol.h',
         'helper/tora-helper.h',
         ]
