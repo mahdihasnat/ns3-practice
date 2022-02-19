@@ -52,6 +52,11 @@ public:
    */
   int64_t AssignStreams (int64_t stream);
 
+  Ptr<Ipv4Route>LoopbackRoute (const Ipv4Header & hdr, Ptr<NetDevice> oif) const;
+  void DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header,
+                                      UnicastForwardCallback ucb, ErrorCallback ecb);
+  bool IsMyOwnAddress (Ipv4Address src);
+
 private:
   /**
    * Get unique id for all routiers in network
@@ -63,6 +68,9 @@ private:
   
   /// IP protocol
   Ptr<Ipv4> m_ipv4;
+
+  //
+  Ptr<NetDevice> m_lo;
 
   /// Provides uniform random variables.
   Ptr<UniformRandomVariable> m_uniformRandomVariable;
