@@ -105,7 +105,8 @@ int main(int argc, char *argv[])
 
 	// disable hellopacket in all node of routing
 	Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
-	Ipv4RoutingHelper * routing = new AodvHelper();
+	Ipv4RoutingHelper * routing = new ToraHelper();
+	// Ipv4RoutingHelper * routing = new AodvHelper();
 	experiment.Run(simulationTime, routing);
 	delete routing;
 

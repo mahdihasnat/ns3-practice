@@ -4,6 +4,8 @@
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 
+#include "tora-height.h"
+
 namespace ns3
 {
 
@@ -88,6 +90,35 @@ private:
   */
 std::ostream & operator<< (std::ostream & os, QryHeader const &);
 
+
+// contains destination ip, and height of node i -which is broadcasting the packet-
+class UpdHeader : public Header
+{
+public:
+	UpdHeader(Ipv4Address dst = Ipv4Address(), Height h = Height());
+	virtual ~UpdHeader();
+
+	//object
+	static TypeId GetTypeId ();
+	TypeId GetInstanceTypeId () const;
+
+	//header
+	uint32_t GetSerializedSize () const;
+	void Serialize (Buffer::Iterator start) const;
+	uint32_t Deserialize (Buffer::Iterator start);
+	void Print (std::ostream &os) const;
+
+private:
+	uint8_t m_version;		///< version number , currently 1
+	uint8_t m_type;			///< packet type, 2 for Upd
+	uint16_t m_reserved;	///< reserved field , must be zero
+
+	Ipv4Address m_dst; 		///< destination ip address ,32 bit
+	Height m_height;		///< height of the node ,
+
+};
+
+std::ostream & operator<< (std::ostream & os, UpdHeader const &);
 
 } // tora
 
