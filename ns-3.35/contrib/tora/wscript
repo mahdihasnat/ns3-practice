@@ -10,11 +10,10 @@ def build(bld):
     module = bld.create_ns3_module('tora', ['core','internet'])
     module.source = [
         'model/tora.cc',
-        'model/tora-packet.cc',
         'model/tora-height.cc',
+        'model/tora-packet.cc',
         'model/tora-routing-protocol.cc',
         'helper/tora-helper.cc',
-
         ]
 
     module_test = bld.create_ns3_module_test_library('tora')

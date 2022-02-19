@@ -6,6 +6,7 @@ using namespace tora;
 
 NS_LOG_COMPONENT_DEFINE ("ToraHeight");
 
+NS_OBJECT_ENSURE_REGISTERED (Height);
 Height::Height (Time tao , uint32_t oid , bool r , uint32_t delta , uint32_t i):
 	m_tao (tao),
 	m_oid (oid),
@@ -19,6 +20,70 @@ Height::Height (Time tao , uint32_t oid , bool r , uint32_t delta , uint32_t i):
 Height::~Height()
 {
 	NS_LOG_FUNCTION (this);
+}
+
+
+TypeId
+Height::GetTypeId (void)
+{
+	static TypeId tid = TypeId ("ns3::tora::Height")
+		.SetParent<Header> ()
+		.SetGroupName ("Tora")
+		.AddConstructor<Height> ()
+		;
+	return tid;
+}
+
+TypeId
+Height::GetInstanceTypeId () const
+{
+	return GetTypeId ();
+}
+
+uint32_t
+Height::GetSerializedSize () const
+{
+	return 20;
+}
+
+
+void
+Height::Serialize (Buffer::Iterator start) const
+{
+	start.WriteU64 (m_tao.GetInteger ());
+	start.WriteU32 (m_oid);
+	uint32_t multiplexed = (m_r<<31U)|(m_delta&0x7fffffff);
+	start.WriteU32 (multiplexed);
+	start.WriteU32 (m_i);
+}
+
+uint32_t
+Height::Deserialize (Buffer::Iterator start)
+{
+	Buffer::Iterator i = start;
+	m_tao = Time::FromInteger (i.ReadU64 (), Time::GetResolution());
+	m_oid = i.ReadU32 ();
+	uint32_t multiplexed = i.ReadU32 ();
+	m_r = (multiplexed>>31U)&0x1;
+	m_delta = multiplexed&0x7fffffff;
+	m_i = i.ReadU32 ();
+
+	uint32_t dist =  i.GetDistanceFrom (start);
+	NS_ASSERT (dist == GetSerializedSize ());
+	return dist;
+}
+
+void
+Height::Print (std::ostream &os) const
+{
+	os << "tao=" << m_tao << " oid=" << m_oid << " r=" << m_r << " delta=" << m_delta << " i=" << m_i;
+}
+
+std::ostream &
+operator<< (std::ostream & os, Height const & h)
+{
+	h.Print (os);
+	return os;
 }
 
 Height 
@@ -90,3 +155,4 @@ Height:: operator!=(Height const &h) const
 {
 	return !(*this == h);
 }
+

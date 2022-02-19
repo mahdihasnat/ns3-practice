@@ -3,6 +3,7 @@
 
 
 #include "ns3/core-module.h"
+#include "ns3/network-module.h"
 
 namespace ns3
 {
@@ -24,7 +25,7 @@ namespace tora
  * @cite tora rfc https://www.ietf.org/archive/id/draft-ietf-manet-tora-spec-04.txt
  */
 
-class Height : SimpleRefCount<Height>
+class Height : public Header
 {
 private:
 	Time m_tao;
@@ -33,11 +34,22 @@ private:
 	uint32_t m_delta;
 	uint32_t m_i;
 public:
-	Height (Time tao , uint32_t oid , bool r , uint32_t delta , uint32_t i);
+	Height (Time tao = Seconds(-1) , uint32_t oid =0, bool r =0, uint32_t delta =0, uint32_t i=0);
 	virtual ~Height ();
 
 	static Height GetNullHeight(uint32_t i);
 	static Height GetZeroHeight(uint32_t i);
+
+	// Objects
+	static TypeId GetTypeId (void);
+	TypeId GetInstanceTypeId (void) const;
+
+	// Header
+	uint32_t Deserialize (Buffer::Iterator start);
+	void Serialize (Buffer::Iterator start) const;
+	uint32_t GetSerializedSize (void) const;
+	void Print (std::ostream &os) const;
+
 
 	Time GetTao () const;
 	uint32_t GetOid () const;
@@ -49,6 +61,7 @@ public:
 	bool operator != (const Height &h) const;
 };
 
+std::ostream & operator<< (std::ostream & os, const Height & h);
 
 } // tora
 } // ns3
