@@ -219,6 +219,27 @@ RoutingProtocol:: RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetD
 }
 
 
+/**
+   * \brief Route an input packet (to be forwarded or locally delivered)
+   *
+   * This lookup is used in the forwarding process.  The packet is
+   * handed over to the Ipv4RoutingProtocol, and will get forwarded onward
+   * by one of the callbacks.  The Linux equivalent is ip_route_input().
+   * There are four valid outcomes, and a matching callbacks to handle each.
+   *
+   * \param p received packet
+   * \param header input parameter used to form a search key for a route
+   * \param idev Pointer to ingress network device
+   * \param ucb Callback for the case in which the packet is to be forwarded
+   *            as unicast
+   * \param mcb Callback for the case in which the packet is to be forwarded
+   *            as multicast
+   * \param lcb Callback for the case in which the packet is to be locally
+   *            delivered
+   * \param ecb Callback to call if there is an error in forwarding
+   * \returns true if the Ipv4RoutingProtocol takes responsibility for 
+   *          forwarding or delivering the packet, false otherwise
+   */ 
 bool
 RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,
                    UnicastForwardCallback ucb, MulticastForwardCallback mcb,
@@ -245,6 +266,14 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
 			return true;
 		}
 	}
+
+	if(header.GetProtocol() == GetIpv4HeaderProtocol())
+	{
+		NS_LOG_DEBUG ("Recieved packet with TORA header");
+		RecvTora(p,header);
+		return true;
+	}
+
 
 	return 0;
 }
@@ -309,9 +338,13 @@ RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & he
 	QryHeader qryHeader;
 	qryHeader.SetDst(header.GetDestination());
 	packet->AddHeader(qryHeader);
+	TypeHeader typeHeader(TORATYPE_QRY);
+	packet->AddHeader(typeHeader);
 	Ipv4Address src = m_ipv4->GetAddress(1,0).GetLocal();
 	Ipv4Address dst = m_ipv4->GetAddress(1,0).GetBroadcast();
 	uint8_t prot = 138;
+	NS_LOG_DEBUG("packet: " << packet << " src: " << src << " dst: " << dst << " prot: " << prot);
+
 	callback (packet, src, dst, prot, 0);
 
 	NS_UNUSED (callback);
@@ -330,6 +363,37 @@ RoutingProtocol::IsMyOwnAddress (Ipv4Address src)
 		}
 	}
 	return false;
+}
+
+void
+RoutingProtocol::RecvTora (Ptr<const Packet> p,const Ipv4Header & header)
+{
+	NS_LOG_FUNCTION (this << *p);
+	Ptr<Packet> packet = p->Copy ();
+	NS_LOG_INFO("packet: " << packet);
+	TypeHeader theader;
+	packet->RemoveHeader(theader);
+	if(theader.IsValid() == false)
+	{
+		NS_ASSERT_MSG(false, "TORA packet invalid type header");
+		return;
+	}
+	NS_LOG_DEBUG("header: " << theader);
+
+	switch(theader.Get())
+	{
+		case TORATYPE_QRY:
+			RecvQry(packet, header);
+			break;
+		default:
+			NS_ASSERT_MSG(false, "TORA packet not handled");
+	}
+}
+
+void
+RoutingProtocol::RecvQry(Ptr<const Packet> p,const Ipv4Header & header)
+{
+	NS_LOG_FUNCTION (this << p);
 }
 
 

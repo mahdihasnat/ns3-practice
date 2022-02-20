@@ -5,6 +5,7 @@
 
 #include "ns3/ipv4-routing-protocol.h"
 #include "ns3/random-variable-stream.h"
+#include "tora-packet.h"
 
 namespace ns3 {
 
@@ -58,7 +59,9 @@ public:
   bool IsMyOwnAddress (Ipv4Address src);
 
 protected:
-  // virtual void RecvTORA ();
+  virtual void RecvTora (Ptr<const Packet> , const Ipv4Header & );
+  virtual void RecvQry (Ptr<const Packet> , const Ipv4Header & );
+  
 
 private:
   /**

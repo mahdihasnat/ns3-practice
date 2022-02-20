@@ -2,8 +2,12 @@
 
 #include "tora-packet.h"
 
-using namespace ns3;
-using namespace tora;
+namespace ns3
+{
+
+namespace tora
+{
+
 
 //-----------------------------------------------------------------------------
 // TypeHeader
@@ -173,12 +177,16 @@ QryHeader::Print(std::ostream &os) const
 	os << "dst: " << m_dst;
 }
 
+
 std::ostream & 
 operator<< (std::ostream & os, QryHeader const & h)
 {
 	h.Print (os);
 	return os;
 }
+
+
+
 
 bool 
 QryHeader:: operator== (QryHeader const & o) const
@@ -187,3 +195,6 @@ QryHeader:: operator== (QryHeader const & o) const
 }
 
 
+}
+
+}
