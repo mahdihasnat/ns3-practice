@@ -1,7 +1,10 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 
 #include "tora-routing-protocol.h"
+#include "tora-packet.h"
 #include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/internet-module.h"
 #include "ns3/ipv4-routing-protocol.h"
 #include "ns3/node.h"
 
@@ -96,6 +99,13 @@ NS_OBJECT_ENSURE_REGISTERED (DeferredRouteOutputTag);
 //------------------------------------------------------------------------
 
 NS_OBJECT_ENSURE_REGISTERED(RoutingProtocol);
+
+// https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml#:~:text=138,MANET%20Protocols
+uint8_t 
+RoutingProtocol::GetIpv4HeaderProtocol(void)
+{
+	return 138;
+}
 
 RoutingProtocol::RoutingProtocol():Ipv4RoutingProtocol()
 {
@@ -193,6 +203,8 @@ RoutingProtocol:: RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetD
 {
 	NS_LOG_FUNCTION (this << header << (oif ? oif->GetIfIndex () : 0));
 
+	NS_ASSERT_MSG(header.GetProtocol() != GetIpv4HeaderProtocol() , "Manet routing protocol is not allowed to be used as the IPv4 header protocol");
+
 	// Valid route not found, in this case we return loopback.
 	// Actual route request will be deferred until packet will be fully formed,
 	// routed to loopback, received from loopback and passed to RouteInput (see below)
@@ -280,6 +292,30 @@ RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & he
 	NS_LOG_FUNCTION (this << p << header);
 	NS_ASSERT (p != 0 && p != Ptr<Packet> ());
 
+	// get DownTargetCallback from IpL4Protocol
+	Ptr<IpL4Protocol> protocol = m_ipv4->GetProtocol (17);
+	NS_ASSERT_MSG (protocol != 0, "No IpL4Protocol installed");
+	IpL4Protocol::DownTargetCallback callback = protocol->GetDownTarget ();
+	NS_ASSERT_MSG (callback.IsNull() == false, "No down callback found installed");
+
+	// callback signature
+	// void (Ptr<Node> node, Ptr<Packet> packet, Ipv4Address source, 
+	//        Ipv4Address destination, uint8_t protocol, Ptr<Ipv4Route> route)
+
+	// create new QryHeader  packet
+	Ptr<Packet> packet = Create<Packet>();
+	
+	// create new QryHeader
+	QryHeader qryHeader;
+	qryHeader.SetDst(header.GetDestination());
+	packet->AddHeader(qryHeader);
+	Ipv4Address src = m_ipv4->GetAddress(1,0).GetLocal();
+	Ipv4Address dst = m_ipv4->GetAddress(1,0).GetBroadcast();
+	uint8_t prot = 138;
+	callback (packet, src, dst, prot, 0);
+
+	NS_UNUSED (callback);
+	
 }
 
 bool

@@ -57,6 +57,9 @@ public:
                                       UnicastForwardCallback ucb, ErrorCallback ecb);
   bool IsMyOwnAddress (Ipv4Address src);
 
+protected:
+  // virtual void RecvTORA ();
+
 private:
   /**
    * Get unique id for all routiers in network
@@ -65,6 +68,8 @@ private:
    * @return uint32_t 
    */
   uint32_t GetRouterId(void) const;
+
+  static uint8_t GetIpv4HeaderProtocol(void);
   
   /// IP protocol
   Ptr<Ipv4> m_ipv4;
