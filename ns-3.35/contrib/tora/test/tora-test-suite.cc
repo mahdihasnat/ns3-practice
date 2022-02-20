@@ -68,7 +68,7 @@ struct QryHeaderTest : public TestCase
     p->AddHeader(h);
     QryHeader h2;
     uint32_t bytes = p->RemoveHeader(h2);
-    NS_TEST_ASSERT_MSG_EQ (bytes, 8, "Qry is 8 byts long");
+    NS_TEST_ASSERT_MSG_EQ (bytes, 4, "Qry is 4 byts long");
     NS_TEST_ASSERT_MSG_EQ (h2.GetDst(), Ipv4Address("255.0.12.17") ,"Round trip serialization works"); 
 
   }

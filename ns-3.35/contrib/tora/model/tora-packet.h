@@ -12,6 +12,73 @@ namespace ns3
 namespace tora
 {
 
+
+enum MessageType
+{
+  TORATYPE_QRY  = 1,   //!< TORATYPE_QRY
+  TORATYPE_UPD  = 2,   //!< TORATYPE_UPD
+  TORATYPE_CLR  = 3,   //!< TORATYPE_CLR
+};
+
+/**
+* \ingroup aodv
+* \brief AODV types
+*/
+class TypeHeader : public Header
+{
+public:
+  /**
+   * constructor
+   * \param t the AODV RREQ type
+   */
+  TypeHeader (MessageType t = TORATYPE_QRY);
+
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
+  static TypeId GetTypeId ();
+  TypeId GetInstanceTypeId () const;
+  uint32_t GetSerializedSize () const;
+  void Serialize (Buffer::Iterator start) const;
+  uint32_t Deserialize (Buffer::Iterator start);
+  void Print (std::ostream &os) const;
+
+  /**
+   * \returns the type
+   */
+  MessageType Get () const
+  {
+    return m_type;
+  }
+  /**
+   * Check that type if valid
+   * \returns true if the type is valid
+   */
+  bool IsValid () const
+  {
+    return m_valid;
+  }
+  /**
+   * \brief Comparison operator
+   * \param o header to compare
+   * \return true if the headers are equal
+   */
+  bool operator== (TypeHeader const & o) const;
+private:
+  MessageType m_type; ///< type of the message
+  bool m_valid; ///< Indicates if the message is valid
+};
+
+/**
+  * \brief Stream output operator
+  * \param os output stream
+  * \return updated stream
+  */
+std::ostream & operator<< (std::ostream & os, TypeHeader const & h);
+
+
+
 /**
  *  \ingroup tora
  *  \brief Query packet for TORA routing protocol.
@@ -77,9 +144,6 @@ public:
 	}
 
 private:
-	uint8_t m_version;		///< version number , currently 1
-	uint8_t m_type;			///< packet type, 1 for Qry
-	uint16_t m_reserved;	///< reserved field , must be zero
 	Ipv4Address m_dst; 		///< destination ip address ,32 bit
 };
 

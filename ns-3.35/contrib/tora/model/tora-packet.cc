@@ -6,16 +6,118 @@ using namespace ns3;
 using namespace tora;
 
 //-----------------------------------------------------------------------------
+// TypeHeader
+//-----------------------------------------------------------------------------
+
+NS_OBJECT_ENSURE_REGISTERED (TypeHeader);
+
+TypeHeader::TypeHeader (MessageType t)
+  : m_type (t),
+    m_valid (true)
+{
+}
+
+TypeId
+TypeHeader::GetTypeId ()
+{
+  static TypeId tid = TypeId ("ns3::tora::TypeHeader")
+    .SetParent<Header> ()
+    .SetGroupName ("Tora")
+    .AddConstructor<TypeHeader> ()
+  ;
+  return tid;
+}
+
+TypeId
+TypeHeader::GetInstanceTypeId () const
+{
+  return GetTypeId ();
+}
+
+uint32_t
+TypeHeader::GetSerializedSize () const
+{
+  return 1;
+}
+
+void
+TypeHeader::Serialize (Buffer::Iterator i) const
+{
+  i.WriteU8 ((uint8_t) m_type);
+}
+
+uint32_t
+TypeHeader::Deserialize (Buffer::Iterator start)
+{
+  Buffer::Iterator i = start;
+  uint8_t type = i.ReadU8 ();
+  m_valid = true;
+  switch (type)
+    {
+	case TORATYPE_QRY:
+	case TORATYPE_UPD:
+	case TORATYPE_CLR:
+      {
+        m_type = (MessageType) type;
+        break;
+      }
+    default:
+      m_valid = false;
+    }
+  uint32_t dist = i.GetDistanceFrom (start);
+  NS_ASSERT (dist == GetSerializedSize ());
+  return dist;
+}
+
+void
+TypeHeader::Print (std::ostream &os) const
+{
+  switch (m_type)
+    {
+    case TORATYPE_QRY:
+      {
+        os << "QRY";
+        break;
+      }
+    case TORATYPE_UPD:
+      {
+        os << "UPD";
+        break;
+      }
+    case TORATYPE_CLR:
+      {
+        os << "CLR";
+        break;
+      }
+    default:
+      os << "UNKNOWN_TYPE";
+    }
+}
+
+bool
+TypeHeader::operator== (TypeHeader const & o) const
+{
+  return (m_type == o.m_type && m_valid == o.m_valid);
+}
+
+std::ostream &
+operator<< (std::ostream & os, TypeHeader const & h)
+{
+  h.Print (os);
+  return os;
+}
+
+
+
+
+//-----------------------------------------------------------------------------
 // QryHeader
 //-----------------------------------------------------------------------------
 
 NS_OBJECT_ENSURE_REGISTERED (QryHeader);
 
 QryHeader::QryHeader(Ipv4Address dst)
-	: m_version(1),
-		m_type(1),
-		m_reserved(0),
-		m_dst(dst)
+	:	m_dst(dst)
 {
 	;
 }
@@ -45,15 +147,12 @@ QryHeader::GetInstanceTypeId () const
 uint32_t
 QryHeader::GetSerializedSize () const
 {
-	return 8;
+	return 4;
 }
 
 void
 QryHeader::Serialize (Buffer::Iterator start) const
 {
-	start.WriteU8 (m_version);
-	start.WriteU8 (m_type);
-	start.WriteU16 (m_reserved);
 	WriteTo(start, m_dst);
 }
 
@@ -61,9 +160,6 @@ uint32_t
 QryHeader::Deserialize (Buffer::Iterator start)
 {
 	Buffer::Iterator i = start;
-	m_version = start.ReadU8 ();
-	m_type = start.ReadU8 ();
-	m_reserved = start.ReadU16 ();
 	ReadFrom(start, m_dst);
 	
 	uint32_t dist = i.GetDistanceFrom (start);
@@ -74,7 +170,7 @@ QryHeader::Deserialize (Buffer::Iterator start)
 void
 QryHeader::Print(std::ostream &os) const
 {
-	os << "QRY destination: ipv4 " << m_dst;
+	os << "dst: " << m_dst;
 }
 
 std::ostream & 
@@ -87,10 +183,7 @@ operator<< (std::ostream & os, QryHeader const & h)
 bool 
 QryHeader:: operator== (QryHeader const & o) const
 {
-	return (m_version == o.m_version
-	 && m_type == o.m_type 
-	 && m_reserved == o.m_reserved 
-	 && m_dst == o.m_dst);
+	return (m_dst == o.m_dst);
 }
 
 
