@@ -38,6 +38,11 @@ public:
 	map<uint64_t,Time> m_TxTimeOfPacket;
 	Time m_TotalEnd2EndDelay = Seconds(0);
 	uint128_t m_TotalLocalDeliveredL3Packet = 0;
+	
+	long double m_throughput = 0;
+	long double m_averageEnd2EndDelay = 0;
+	long double m_packetDropRatio = 0;
+	long double m_packetDelivaryRatio = 0;
 
 	RoutingExperiment(int n, int nFlows, double nodeSpeed)
 	{
@@ -237,9 +242,12 @@ public:
 		NS_LOG_INFO("Total packets sent: " << (long long)m_TxPacketL3);
 		NS_LOG_INFO("Total packets received: " << (long long)m_RxPacketL3);
 		NS_LOG_INFO("Total packets dropped: " << (long long)m_DropPacketL3);
-		NS_LOG_INFO("Packet Delivery Ratio (L3): " << PacketDeliveryRatioL3() << "%");
-		NS_LOG_INFO("Packet Drop Ratio (L3): " << PacketDropRatioL3() << "%");
+		m_packetDelivaryRatio =PacketDeliveryRatioL3();
+		NS_LOG_INFO("Packet Delivery Ratio (L3): " << m_packetDelivaryRatio << "%");
+		m_packetDropRatio = PacketDropRatioL3();
+		NS_LOG_INFO("Packet Drop Ratio (L3): " << m_packetDropRatio << "%");
 		NS_LOG_INFO("Average end-to-end delay: " << m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet << "s");
+		m_averageEnd2EndDelay = m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet;
 	}
 };
 
@@ -442,5 +450,6 @@ void RoutingExperiment::CalculateThroughput(FlowMonitorHelper &flowmonHelper, do
 	NS_LOG_INFO("Start time: " << start_time);
 	NS_LOG_INFO("End time: " << end_time);
 	long double throughput = total_rx ? total_rx * 8.0 / (end_time.GetSeconds() - start_time.GetSeconds()) / 1e6 : 0;
+	m_throughput=throughput;
 	NS_LOG_INFO("Average Throughput: " << throughput << " Mbps");
 }
