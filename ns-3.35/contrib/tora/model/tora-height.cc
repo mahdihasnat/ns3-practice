@@ -1,8 +1,11 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 
 #include "tora-height.h"
-using namespace ns3;
-using namespace tora;
+namespace ns3
+{
+
+namespace tora
+{
 
 NS_LOG_COMPONENT_DEFINE ("ToraHeight");
 
@@ -156,3 +159,5 @@ Height:: operator!=(Height const &h) const
 	return !(*this == h);
 }
 
+} // tora
+} // ns3

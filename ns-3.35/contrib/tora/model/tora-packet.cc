@@ -194,7 +194,72 @@ QryHeader:: operator== (QryHeader const & o) const
 	return (m_dst == o.m_dst);
 }
 
+//-----------------------------------------------------------------------------
+// UpdHeader
+//-----------------------------------------------------------------------------
 
+UpdHeader::UpdHeader(Ipv4Address dst, Height height):
+  m_dst(dst), m_height(height)
+{
+  ;
 }
 
+UpdHeader::~UpdHeader()
+{
+  ;
 }
+
+TypeId
+UpdHeader::GetTypeId ()
+{
+  static TypeId tid = TypeId ("ns3::tora::UpdHeader")
+          .SetParent<Header> ()
+          .SetGroupName ("Tora")
+          .AddConstructor<UpdHeader> ()
+          ;
+  return tid;
+}
+
+TypeId 
+UpdHeader::GetInstanceTypeId () const
+{
+  return GetTypeId ();
+}
+
+
+uint32_t
+UpdHeader:: GetSerializedSize () const
+{
+  return 4 + m_height.GetSerializedSize ();
+}
+void
+UpdHeader::Serialize (Buffer::Iterator start) const
+{
+  WriteTo(start, m_dst);
+  m_height.Serialize(start);
+}
+uint32_t
+UpdHeader::Deserialize (Buffer::Iterator start)
+{
+  Buffer::Iterator i = start;
+  ReadFrom(start, m_dst);
+  uint32_t dist = i.GetDistanceFrom (start);
+  NS_ASSERT_MSG(dist == 4 , "UpdHeader::Deserialize(): dist != 4");
+  
+  return 4+m_height.Deserialize(start);
+}
+
+void
+UpdHeader::Print (std::ostream &os) const
+{
+  os << "dst: " << m_dst << " height: " << m_height;
+}
+
+std::ostream & operator<< (std::ostream & os, UpdHeader const &h)
+{
+  h.Print (os);
+  return os;
+}
+
+} // tora
+} // ns3

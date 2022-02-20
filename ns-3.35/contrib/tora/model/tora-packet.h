@@ -155,8 +155,7 @@ private:
 std::ostream & operator<< (std::ostream & os, QryHeader const &);
 
 
-// contains destination ip, and height of node i -which is broadcasting the packet-
-class UpdHeader : public Header
+class UpdHeader:public Header
 {
 public:
 	UpdHeader(Ipv4Address dst = Ipv4Address(), Height h = Height());
@@ -172,17 +171,13 @@ public:
 	uint32_t Deserialize (Buffer::Iterator start);
 	void Print (std::ostream &os) const;
 
-private:
-	uint8_t m_version;		///< version number , currently 1
-	uint8_t m_type;			///< packet type, 2 for Upd
-	uint16_t m_reserved;	///< reserved field , must be zero
-
+public:
 	Ipv4Address m_dst; 		///< destination ip address ,32 bit
 	Height m_height;		///< height of the node ,
-
 };
 
 std::ostream & operator<< (std::ostream & os, UpdHeader const &);
+
 
 } // tora
 

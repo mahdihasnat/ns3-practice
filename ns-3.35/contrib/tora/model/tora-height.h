@@ -34,7 +34,7 @@ private:
 	uint32_t m_delta;
 	uint32_t m_i;
 public:
-	Height (Time tao = Seconds(-1) , uint32_t oid =0, bool r =0, uint32_t delta =0, uint32_t i=0);
+	Height (Time tao = Time::Max() , uint32_t oid =0, bool r =0, uint32_t delta =0, uint32_t i=0);
 	virtual ~Height ();
 
 	static Height GetNullHeight(uint32_t i);
