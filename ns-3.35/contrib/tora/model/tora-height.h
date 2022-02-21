@@ -56,6 +56,17 @@ public:
 	bool GetR () const;
 	uint32_t GetDelta () const;
 	uint32_t GetI () const;
+
+	void SetDelta (uint32_t delta)
+	{
+		m_delta = delta;
+	}
+	void SetI (uint32_t i)
+	{
+		m_i = i;
+	}
+
+
 	bool operator <  (const Height &h) const;
 	bool operator == (const Height &h) const;
 	bool operator != (const Height &h) const;
