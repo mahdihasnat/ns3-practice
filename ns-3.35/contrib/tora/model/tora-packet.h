@@ -18,6 +18,7 @@ enum MessageType
   TORATYPE_QRY  = 1,   //!< TORATYPE_QRY
   TORATYPE_UPD  = 2,   //!< TORATYPE_UPD
   TORATYPE_CLR  = 3,   //!< TORATYPE_CLR
+  TORATYPE_HLO  = 4,   //!< TORATYPE_HLO
 };
 
 /**
@@ -76,6 +77,36 @@ private:
   * \return updated stream
   */
 std::ostream & operator<< (std::ostream & os, TypeHeader const & h);
+
+
+class HelloHeader : public Header
+{
+public:
+	HelloHeader(Ipv4Address src=Ipv4Address());
+	~HelloHeader();
+
+	static TypeId GetTypeId();
+	TypeId GetInstanceTypeId() const;
+
+	uint32_t GetSerializedSize() const;
+	void Serialize(Buffer::Iterator start) const;
+	uint32_t Deserialize(Buffer::Iterator start);
+	void Print(std::ostream &os) const;
+
+	Ipv4Address GetSrc() const
+	{
+		return m_src;
+	}
+	void SetSrc(Ipv4Address src)
+	{
+		m_src = src;
+	}
+
+private:
+	Ipv4Address m_src;
+};
+
+std::ostream & operator<< (std::ostream & os, HelloHeader const & h);
 
 
 

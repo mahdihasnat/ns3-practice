@@ -61,6 +61,7 @@ TypeHeader::Deserialize (Buffer::Iterator start)
 	case TORATYPE_QRY:
 	case TORATYPE_UPD:
 	case TORATYPE_CLR:
+  case TORATYPE_HLO:
       {
         m_type = (MessageType) type;
         break;
@@ -93,6 +94,11 @@ TypeHeader::Print (std::ostream &os) const
         os << "CLR";
         break;
       }
+    case TORATYPE_HLO:
+      {
+        os << "HLO";
+        break;
+      }
     default:
       os << "UNKNOWN_TYPE";
     }
@@ -112,6 +118,72 @@ operator<< (std::ostream & os, TypeHeader const & h)
 }
 
 
+//-----------------------------------------------------------------------------
+// HelloHeader
+//-----------------------------------------------------------------------------
+
+
+HelloHeader::HelloHeader(Ipv4Address src):
+  m_src(src)
+{
+}
+
+HelloHeader::~HelloHeader()
+{
+}
+
+TypeId
+HelloHeader::GetTypeId()
+{
+  static TypeId tid = TypeId("ns3::tora::HelloHeader")
+    .SetParent<Header>()
+    .SetGroupName("Tora")
+    .AddConstructor<HelloHeader>()
+  ;
+  return tid;
+}
+
+TypeId
+HelloHeader::GetInstanceTypeId() const
+{
+  return GetTypeId();
+}
+
+
+uint32_t
+HelloHeader::GetSerializedSize() const
+{
+  return (4);
+}
+
+void
+HelloHeader::Serialize(Buffer::Iterator i) const
+{
+  WriteTo(i, m_src);
+}
+
+
+uint32_t
+HelloHeader::Deserialize(Buffer::Iterator start)
+{
+  Buffer::Iterator i = start;
+  ReadFrom(i, m_src);
+  uint32_t dist = i.GetDistanceFrom(start);
+  NS_ASSERT(dist == GetSerializedSize());
+  return dist;
+}
+
+void
+HelloHeader::Print(std::ostream &os) const
+{
+  os << "Src: " << m_src;
+}
+
+std::ostream & operator<< (std::ostream & os, HelloHeader const & h)
+{
+  h.Print (os);
+  return os;
+}
 
 
 //-----------------------------------------------------------------------------
