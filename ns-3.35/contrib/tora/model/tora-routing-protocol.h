@@ -57,13 +57,26 @@ public:
   void DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header,
                                       UnicastForwardCallback ucb, ErrorCallback ecb);
   bool IsMyOwnAddress (Ipv4Address src);
+  Ipv4Address GetMyAddress(void) const
+  {
+    // return address from ipv4 interface
+    return m_ipv4->GetAddress(1,0).GetLocal();
+  }
 
 protected:
+  virtual void DoInitialize (void);
+
   virtual void RecvTora (Ptr<const Packet> , const Ipv4Header & );
-  virtual void RecvQry (Ptr<const Packet> , const Ipv4Header & );
+  void ProcessQry (Ipv4Address const & src,Ipv4Address const & dst);
+  void ProcessHello (Ipv4Address const & src);
   
+  void BroadcastMsg(Ptr<Packet> p);
+  void SendHello ();
+  void SendQry (Ipv4Address const & dst);
 
 private:
+
+  void Start(void);
   /**
    * Get unique id for all routiers in network
    * @brief Get the Router Id object
@@ -77,11 +90,30 @@ private:
   /// IP protocol
   Ptr<Ipv4> m_ipv4;
 
-  //
+  // loopback devices
   Ptr<NetDevice> m_lo;
 
   /// Provides uniform random variables.
   Ptr<UniformRandomVariable> m_uniformRandomVariable;
+
+  // RouteRequiredFlag for each node , 
+  // if true , then rreqflag is set, unset otherwise
+  std::map<uint32_t , bool> m_routeRequiredFlag;
+  bool GetRouteRequiredFlag(uint32_t id) const
+  {
+    auto it = m_routeRequiredFlag.find(id);
+    if(it == m_routeRequiredFlag.end())
+      return false;
+    return it->second;
+  }
+  
+
+
+  // link awareness functionality
+  Time m_helloInterval;
+  Timer m_htimer;
+  Time m_lastBcastTime;
+  void HelloTimerExpire(void);
 
 };
 

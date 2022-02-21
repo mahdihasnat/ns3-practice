@@ -107,7 +107,11 @@ RoutingProtocol::GetIpv4HeaderProtocol(void)
 	return 138;
 }
 
-RoutingProtocol::RoutingProtocol():Ipv4RoutingProtocol()
+RoutingProtocol::RoutingProtocol():
+				Ipv4RoutingProtocol(),
+				m_helloInterval(Seconds(1)),
+				m_htimer (Timer::CANCEL_ON_DESTROY),
+				m_lastBcastTime (Seconds (0))
 {
 	NS_LOG_FUNCTION(this);
 }
@@ -127,6 +131,10 @@ RoutingProtocol::GetTypeId(void)
                    StringValue ("ns3::UniformRandomVariable"),
                    MakePointerAccessor (&RoutingProtocol::m_uniformRandomVariable),
                    MakePointerChecker<UniformRandomVariable> ())
+			.AddAttribute ("HelloInterval", "HELLO messages emission interval.",
+                   TimeValue (Seconds (1)),
+                   MakeTimeAccessor (&RoutingProtocol::m_helloInterval),
+                   MakeTimeChecker ())
 			;
 	return tid;
 }
@@ -135,7 +143,8 @@ void
 RoutingProtocol::DoDispose ()
 {
 	m_ipv4 = 0;
-	
+	m_routeRequiredFlag.clear();
+	m_htimer.Cancel();
 	Ipv4RoutingProtocol::DoDispose ();
 }
 
@@ -151,13 +160,14 @@ RoutingProtocol::SetIpv4 (Ptr<Ipv4> ipv4)
 	NS_ASSERT (m_ipv4->GetNInterfaces () == 1 && m_ipv4->GetAddress (0, 0).GetLocal () == Ipv4Address ("127.0.0.1"));
 	m_lo = m_ipv4->GetNetDevice (0);
 	NS_ASSERT (m_lo != 0);
-	
+
+	Simulator::ScheduleNow (&RoutingProtocol::Start, this);
 }
 
 uint32_t
 RoutingProtocol::GetRouterId (void) const
 {
-	return m_ipv4->GetObject<Node>()->GetId();
+	return GetMyAddress().Get();
 }
 
 void
@@ -315,12 +325,10 @@ RoutingProtocol::LoopbackRoute (const Ipv4Header & hdr, Ptr<NetDevice> oif) cons
 }
 
 void
-RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header,
-                                      UnicastForwardCallback ucb, ErrorCallback ecb)
+RoutingProtocol:: BroadcastMsg(Ptr<Packet> p)
 {
-	NS_LOG_FUNCTION (this << p << header);
-	NS_ASSERT (p != 0 && p != Ptr<Packet> ());
-
+	NS_LOG_FUNCTION (this << p);
+	
 	// get DownTargetCallback from IpL4Protocol
 	Ptr<IpL4Protocol> protocol = m_ipv4->GetProtocol (17);
 	NS_ASSERT_MSG (protocol != 0, "No IpL4Protocol installed");
@@ -331,24 +339,29 @@ RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & he
 	// void (Ptr<Node> node, Ptr<Packet> packet, Ipv4Address source, 
 	//        Ipv4Address destination, uint8_t protocol, Ptr<Ipv4Route> route)
 
-	// create new QryHeader  packet
-	Ptr<Packet> packet = Create<Packet>();
-	
-	// create new QryHeader
-	QryHeader qryHeader;
-	qryHeader.SetDst(header.GetDestination());
-	packet->AddHeader(qryHeader);
-	TypeHeader typeHeader(TORATYPE_QRY);
-	packet->AddHeader(typeHeader);
 	Ipv4Address src = m_ipv4->GetAddress(1,0).GetLocal();
 	Ipv4Address dst = m_ipv4->GetAddress(1,0).GetBroadcast();
 	uint8_t prot = 138;
-	NS_LOG_DEBUG("packet: " << packet << " src: " << src << " dst: " << dst << " prot: " << prot);
+	NS_LOG_DEBUG("packet: " << p << " src: " << src << " dst: " << dst << " prot: " << prot);
 
-	callback (packet, src, dst, prot, 0);
+	callback (p, src, dst, prot, 0);
 
 	NS_UNUSED (callback);
+}
+
+
+void
+RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header,
+                                      UnicastForwardCallback ucb, ErrorCallback ecb)
+{
+	NS_LOG_FUNCTION (this << p << header);
+	NS_ASSERT (p != 0 && p != Ptr<Packet> ());
+
+
+	// create new QryHeader  packet
+	Ptr<Packet> packet = Create<Packet>();
 	
+	SendQry(header.GetDestination());
 }
 
 bool
@@ -383,20 +396,121 @@ RoutingProtocol::RecvTora (Ptr<const Packet> p,const Ipv4Header & header)
 	switch(theader.Get())
 	{
 		case TORATYPE_QRY:
-			RecvQry(packet, header);
+			{
+				QryHeader qheader;
+				packet->RemoveHeader(qheader);
+				ProcessQry(header.GetSource() , qheader.GetDst());
+			}
 			break;
+
+		case TORATYPE_HLO:
+			{
+				HelloHeader hheader;
+				packet->RemoveHeader(hheader);
+				ProcessHello(hheader.GetSrc());
+			}
+			break;
+
 		default:
 			NS_ASSERT_MSG(false, "TORA packet not handled");
 	}
 }
 
+
+
 void
-RoutingProtocol::RecvQry(Ptr<const Packet> p,const Ipv4Header & header)
+RoutingProtocol::ProcessQry (Ipv4Address const & src,Ipv4Address const & dst)
 {
-	NS_LOG_FUNCTION (this << p);
+
+	ProcessHello(src);
+	NS_LOG_FUNCTION (this << dst);
+	if(GetRouteRequiredFlag(dst.Get()) == true)
+	{
+		return ;
+	}
+}
+
+void
+RoutingProtocol::ProcessHello (Ipv4Address const & src)
+{
+	NS_LOG_FUNCTION (this << src);
+
+}
+
+void
+RoutingProtocol:: SendHello ()
+{
+	NS_LOG_FUNCTION (this);
+	Ptr<Packet> p = Create<Packet> ();
+	HelloHeader h;
+	h.SetSrc (GetMyAddress());
+	TypeHeader t (TORATYPE_HLO);
+	NS_ASSERT_MSG (t.IsValid(), "TORA Type Header is invalid");
+	p->AddHeader (h);
+	p->AddHeader (t);
+	BroadcastMsg(p);
+}
+
+void
+RoutingProtocol:: SendQry (Ipv4Address const & dst)
+{
+	NS_LOG_FUNCTION (this << dst);
+
+	Ptr<Packet> p = Create<Packet> ();
+
+	// create new QryHeader
+	QryHeader qryHeader;
+	qryHeader.SetDst(dst);
+	p->AddHeader(qryHeader);
+
+	TypeHeader typeHeader(TORATYPE_QRY);
+	p->AddHeader(typeHeader);
+	
+	m_lastBcastTime = Simulator::Now();
+	BroadcastMsg(p);
+}
+
+void
+RoutingProtocol:: HelloTimerExpire(void)
+{
+	NS_LOG_FUNCTION (this);
+	Time offset = Time (Seconds (0));
+	if (m_lastBcastTime > Time (Seconds (0)))
+	{
+		offset = Simulator::Now () - m_lastBcastTime;
+		NS_LOG_DEBUG ("Hello deferred due to last bcast at:" << m_lastBcastTime);
+	}
+	else
+	{
+		SendHello ();
+	}
+	m_htimer.Cancel ();
+	Time diff = m_helloInterval - offset;
+	m_htimer.Schedule (std::max (Time (Seconds (0)), diff));
+	m_lastBcastTime = Time (Seconds (0));
+}
+
+void
+RoutingProtocol::DoInitialize (void)
+{
+	NS_LOG_FUNCTION (this);
+	uint32_t startTime;
+
+	m_htimer.SetFunction (&RoutingProtocol::HelloTimerExpire, this);
+	startTime = m_uniformRandomVariable->GetInteger (0, 100);
+	NS_LOG_DEBUG ("Starting at time " << startTime << "ms");
+	m_htimer.Schedule (MilliSeconds (startTime));
+    
+	Ipv4RoutingProtocol::DoInitialize ();
+}
+
+void
+RoutingProtocol::Start(void)
+{
+	NS_LOG_FUNCTION (this);
 }
 
 
-}
+} // tora
 
-}
+} // ns3
