@@ -112,7 +112,7 @@ RoutingProtocol::RoutingProtocol():
 				m_helloInterval(Seconds(1)),
 				m_htimer (Timer::CANCEL_ON_DESTROY),
 				m_lastBcastTime (Seconds (0)),
-				m_helloRecvTimeout(Seconds(1))
+				m_helloRecvTimeout(Seconds(3))
 {
 	NS_LOG_FUNCTION(this);
 }
@@ -137,7 +137,7 @@ RoutingProtocol::GetTypeId(void)
                    MakeTimeAccessor (&RoutingProtocol::m_helloInterval),
                    MakeTimeChecker ())
 			.AddAttribute ("HelloRecvTimeout", "HELLO messages reception timeout.",
-				   TimeValue (Seconds (0.9)),
+				   TimeValue (Seconds (3)),
 				   MakeTimeAccessor (&RoutingProtocol::m_helloRecvTimeout),
 				   MakeTimeChecker ())
 			;
@@ -221,6 +221,14 @@ RoutingProtocol:: RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetD
 
 	NS_ASSERT_MSG(header.GetProtocol() != GetIpv4HeaderProtocol() , "Manet routing protocol is not allowed to be used as the IPv4 header protocol");
 
+	Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+
+	if(GetRoute(header.GetDestination() , route ))
+	{
+		NS_LOG_INFO("Found route to " << header.GetDestination() << " via " << route->GetGateway());
+		return route;
+	}
+
 	// Valid route not found, in this case we return loopback.
 	// Actual route request will be deferred until packet will be fully formed,
 	// routed to loopback, received from loopback and passed to RouteInput (see below)
@@ -267,10 +275,10 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
 	NS_ASSERT (p != 0);
 	// Check if input device supports IP
 	NS_ASSERT (m_ipv4->GetInterfaceForDevice (idev) >= 0);
-	// int32_t iif = m_ipv4->GetInterfaceForDevice (idev);
+	int32_t iif = m_ipv4->GetInterfaceForDevice (idev);
 	
-	// Ipv4Address dst = header.GetDestination ();
-  	// Ipv4Address origin = header.GetSource ();
+	Ipv4Address dst = header.GetDestination ();
+  	Ipv4Address origin = header.GetSource ();
 
 	// Deferred route request
 	if (idev == m_lo)
@@ -290,10 +298,51 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
 		return true;
 	}
 
+	// Duplicate of own packet
+	if (IsMyOwnAddress (origin))
+	{
+		return true;
+	}
 
-	return 0;
+
+	// Unicast local delivery
+	if (m_ipv4->IsDestinationAddress (dst, iif))
+	{
+		if (lcb.IsNull () == false)
+		{
+			NS_LOG_LOGIC ("Unicast local delivery to " << dst);
+			lcb (p, header, iif);
+		}
+		else
+		{
+			NS_LOG_ERROR ("Unable to deliver packet locally due to null callback " << p->GetUid () << " from " << origin);
+			ecb (p, header, Socket::ERROR_NOROUTETOHOST);
+		}
+		return true;
+	}
+
+	// Check if input device supports IP forwarding
+  if (m_ipv4->IsForwarding (iif) == false)
+    {
+      NS_LOG_LOGIC ("Forwarding disabled for this interface");
+      ecb (p, header, Socket::ERROR_NOROUTETOHOST);
+      return true;
+    }
+
+  // Forwarding
+  return Forwarding (p, header, ucb, ecb);
+
 }
 
+
+bool
+RoutingProtocol::Forwarding (Ptr<const Packet> p, const Ipv4Header & header,
+                             UnicastForwardCallback ucb, ErrorCallback ecb)
+{
+	NS_LOG_FUNCTION(this<<p);
+	NS_ASSERT_MSG(false ,"not implemented");
+	return false;
+}
 
 
 Ptr<Ipv4Route>
@@ -389,7 +438,7 @@ RoutingProtocol::RecvTora (Ptr<const Packet> p,const Ipv4Header & header)
 {
 	NS_LOG_FUNCTION (this << *p);
 	Ptr<Packet> packet = p->Copy ();
-	NS_LOG_INFO("packet: " << packet);
+	// NS_LOG_INFO("packet: " << packet);
 	TypeHeader theader;
 	packet->RemoveHeader(theader);
 	if(theader.IsValid() == false)
@@ -517,15 +566,105 @@ RoutingProtocol::Start(void)
 }
 
 
+// tora rfc
+// 4.7.3 Link with a New Neighbor "k" Established
+
+//    For each destination "j":
+
+//    Set TIME_ACT[j][k] to the current time and increment NUM_ACTIVE[j].
+
+//    If the neighbor "k" is the destination "j", then set
+//    HT_NEIGH[j][k]=ZERO, LNK_STAT[j][k]=DN and increment NUM_DOWN[j],
+//    else set HT_NEIGH[j][k]=NULL and LNK_STAT[j][k]=UN.
+
+//    If the RT_REQ[j] flag is set && neighbor "k" is the destination "j"
+//    then I) else II).
+
+//       I) Set HEIGHT[j]=HT_NEIGH[j][k].  Increment HEIGHT[j].delta.  Set
+//       HEIGHT[j].id to the unique id of this node.  Update LNK_STAT[j][n]
+//       for all n.  Unset the RT_REQ[j] flag.  Set TIME_UPD[j] to the
+//       current time.  Create an UPD packet and place it in the queue to
+//       be sent to all neighbors.  Event Processing Complete.
+
+//       II) If PRO_MODE==1 and HEIGHT[j]!=NULL then A) else B).
+
+//          A) Set TIME_UPD[j] to the current time.  Create an UPD packet
+//          and place it in the queue to be sent to all neighbors.  If the
+//          RT_REQ[j] flag is set, create a QRY packet and place it in the
+//          queue to be sent to all neighbors.  Event Processing Complete.
+
+//          B) If the RT_REQ[j] flag is set, create a QRY packet and place
+//          it in the queue to be sent to all neighbors.  Event Processing
+//          Complete.
+
+
 void
 RoutingProtocol:: NotifyNeighbourUp(uint32_t id)
 {
+	NS_LOG_FUNCTION (this << id);
+	NS_ASSERT_MSG(IsCurrentNeighbour(id) == false, "Neighbour is already up");
+	SetTimeActive(id, Simulator::Now()); // for all dest
+	AddCurrentNeighbour(id); // for all dest
+	{
+		NS_ASSERT(GetHeight(id) == Height::GetNullHeight(id));
+		Height h = Height::GetZeroHeight(id);
+		SetNeighbourHeight(id,id,h); // for dest = id
+		h.SetDelta(1);
+		h.SetI(GetRouterId());
+		SetHeight(id,h); // for dest = id
+		SetDownLink(id,id); // for dest = id
+
+		NS_ASSERT_MSG(GetRouteRequiredFlag(id) == false, "Route required flag is set on new link: not implemented");
+	}
+	
+	// for other dest , defined default
 
 }
+
+
+// tora rfc
+// 4.7.4  Link with Prior Neighbor "k" Severed
+
+//    For each destination "j":
+
+//    Decrement NUM_ACTIVE[j].  If LNK_STAT[j][k]==DN, decrement
+//    NUM_DOWN[j].  If LNK_STAT[j][k]==UP, decrement NUM_UP[j].
+
+//    If NUM_DOWN[j]==0 then I) else II).
+
+//       I) If NUM_ACTIVE[j]==0 then A) else B).
+
+//          A) Set HEIGHT[j]=NULL.  Unset the RT_REQ[j] flag.  Event
+//          Processing Complete.
+
+//          B) If NUM_UP==0 then 1) else 2).
+
+//            1) If HEIGHT[j]==NULL then a) else b).
+
+//                a) Event Processing Complete.
+
+//                b) Set HEIGHT[j]=NULL.  Set TIME_UPD[j] to the current
+//                time.  Create an UPD packet and place it in the queue to
+//                be sent to all neighbors.  Event Processing Complete.
+
+//             2) Set HEIGHT[j].tau to the current time.  Set HEIGHT[j].oid
+//             to the unique id of this node.  Set HEIGHT[j].r=0.  Set
+//             HEIGHT[j].delta=0.  Set HEIGHT[j].id to the unique id of
+//             this node.  Update LNK_STAT[j][n] for all n.  Unset the
+//             RT_REQ[j] flag.  Set TIME_UPD[j] to the current time.
+//             Create an UPD packet and place it in the queue to be sent to
+//             all neighbors.  Event Processing Complete.
+
+//       II) Event Processing Complete.
+
+
 void
 RoutingProtocol:: NotifyNeighbourDown(uint32_t id)
 {
-
+	NS_LOG_FUNCTION (this << id);
+	NS_ASSERT_MSG(IsCurrentNeighbour(id) == true, "Neighbour is not up");
+	RemoveCurrentNeighbour(id);// for all dest
+	RemoveUpDownLink(id); // for all dest
 }
 
 void 
@@ -541,14 +680,15 @@ RoutingProtocol:: HelloRecvUpdate(uint32_t neighbour)
 {
 	NS_LOG_FUNCTION (this <<" neighbour: " << neighbour);
 	auto it = m_helloRecvTimer.find(neighbour);
+	NS_LOG_DEBUG((bool)(it!=m_helloRecvTimer.end()));
 	if(it != m_helloRecvTimer.end())
 	{
 		it->second.Cancel();
 		it->second.Schedule(m_helloRecvTimeout);
-		NotifyNeighbourUp(neighbour);
 	}
 	else 
 	{
+		NotifyNeighbourUp(neighbour);
 		m_helloRecvTimer[neighbour] = Timer(Timer::CANCEL_ON_DESTROY);
 		m_helloRecvTimer[neighbour].SetFunction(&RoutingProtocol::HelloRecvTimerExpire, this);
 		m_helloRecvTimer[neighbour].SetArguments(neighbour);
