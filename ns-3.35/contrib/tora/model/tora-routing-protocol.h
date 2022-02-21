@@ -106,14 +106,19 @@ private:
       return false;
     return it->second;
   }
-  
-
 
   // link awareness functionality
   Time m_helloInterval;
   Timer m_htimer;
   Time m_lastBcastTime;
   void HelloTimerExpire(void);
+  Time m_helloRecvTimeout;
+  std::map<uint32_t ,Timer > m_helloRecvTimer;
+  void HelloRecvTimerExpire(uint32_t id);
+  void HelloRecvUpdate(uint32_t id);
+
+  void NotifyNeighbourUp(uint32_t id);
+  void NotifyNeighbourDown(uint32_t id);
 
 };
 

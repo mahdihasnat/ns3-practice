@@ -111,7 +111,8 @@ RoutingProtocol::RoutingProtocol():
 				Ipv4RoutingProtocol(),
 				m_helloInterval(Seconds(1)),
 				m_htimer (Timer::CANCEL_ON_DESTROY),
-				m_lastBcastTime (Seconds (0))
+				m_lastBcastTime (Seconds (0)),
+				m_helloRecvTimeout(Seconds(1))
 {
 	NS_LOG_FUNCTION(this);
 }
@@ -135,6 +136,10 @@ RoutingProtocol::GetTypeId(void)
                    TimeValue (Seconds (1)),
                    MakeTimeAccessor (&RoutingProtocol::m_helloInterval),
                    MakeTimeChecker ())
+			.AddAttribute ("HelloRecvTimeout", "HELLO messages reception timeout.",
+				   TimeValue (Seconds (0.9)),
+				   MakeTimeAccessor (&RoutingProtocol::m_helloRecvTimeout),
+				   MakeTimeChecker ())
 			;
 	return tid;
 }
@@ -142,6 +147,7 @@ RoutingProtocol::GetTypeId(void)
 void 
 RoutingProtocol::DoDispose ()
 {
+	NS_LOG_FUNCTION(this);
 	m_ipv4 = 0;
 	m_routeRequiredFlag.clear();
 	m_htimer.Cancel();
@@ -434,7 +440,7 @@ void
 RoutingProtocol::ProcessHello (Ipv4Address const & src)
 {
 	NS_LOG_FUNCTION (this << src);
-
+	HelloRecvUpdate(src.Get());
 }
 
 void
@@ -508,6 +514,47 @@ void
 RoutingProtocol::Start(void)
 {
 	NS_LOG_FUNCTION (this);
+}
+
+
+void
+RoutingProtocol:: NotifyNeighbourUp(uint32_t id)
+{
+
+}
+void
+RoutingProtocol:: NotifyNeighbourDown(uint32_t id)
+{
+
+}
+
+void 
+RoutingProtocol::HelloRecvTimerExpire(uint32_t neighbour)
+{
+	NS_LOG_FUNCTION (this <<" neighbour: " << neighbour);
+	NotifyNeighbourDown(neighbour);
+	m_helloRecvTimer.erase(neighbour);
+}
+
+void
+RoutingProtocol:: HelloRecvUpdate(uint32_t neighbour)
+{
+	NS_LOG_FUNCTION (this <<" neighbour: " << neighbour);
+	auto it = m_helloRecvTimer.find(neighbour);
+	if(it != m_helloRecvTimer.end())
+	{
+		it->second.Cancel();
+		it->second.Schedule(m_helloRecvTimeout);
+		NotifyNeighbourUp(neighbour);
+	}
+	else 
+	{
+		m_helloRecvTimer[neighbour] = Timer(Timer::CANCEL_ON_DESTROY);
+		m_helloRecvTimer[neighbour].SetFunction(&RoutingProtocol::HelloRecvTimerExpire, this);
+		m_helloRecvTimer[neighbour].SetArguments(neighbour);
+		m_helloRecvTimer[neighbour].Schedule(m_helloRecvTimeout);
+	}
+
 }
 
 

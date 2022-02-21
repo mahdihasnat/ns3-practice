@@ -12,7 +12,7 @@ cd ns-3.35
 NS_LOG="AodvRoutingProtocol=all|prefix_node|prefix_time|prefix_func:\
 UdpEchoClientApplication=level_info|prefix_func:\
 UdpEchoServerApplication=level_info|prefix_func:\
-ToraRoutingProtocol=level_all|prefix_func|prefix_time|prefix_node"
+ToraRoutingProtocol=level_all|prefix_node|prefix_time|prefix_func"
 # RipHeader=all|prefix_func:\
 # Rip=all|prefix_func:\"
 # gnuplot -p -e 'set xtics rotate;
