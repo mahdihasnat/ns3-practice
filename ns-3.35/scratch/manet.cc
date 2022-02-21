@@ -22,7 +22,7 @@ using namespace std;
 class Test1 : public RoutingExperiment
 {
 public:
-	Test1(int n, int nFlows, double nodeSpeed): RoutingExperiment(n, nFlows, nodeSpeed)
+	Test1(int n, int nFlows, double nodeSpeed): RoutingExperiment(3, nFlows, nodeSpeed)
 	{
 	}
 	void AddMobility(NodeContainer &nodes)
@@ -53,18 +53,30 @@ public:
 	}
 };
 
+int n = 2;
+int nFlows = 2;
+// int packetRate=10; // number of packet per sec
+double nodeSpeed = 20;		   // in m/s
+double simulationTime = 100.0; // in s
+double xRange = 300.0;
+double yRange = 900.0;
+int packetRate = 10; // packets per sec
+uint32_t maxPacketCount = 1;
+
+
+void VaryNodes(RoutingExperiment & re,Ipv4RoutingHelper * routing  )
+{
+	for(int n=10; n<=100; n+=10)
+	{
+		re.Run(simulationTime,routing);
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
 
-	int n = 2;
-	int nFlows = 2;
-	// int packetRate=10; // number of packet per sec
-	double nodeSpeed = 20;		   // in m/s
-	double simulationTime = 100.0; // in s
-	double xRange = 300.0;
-	double yRange = 900.0;
-	int packetRate = 10; // packets per sec
-	uint32_t maxPacketCount = 1;
+	
 
 	LogComponentEnable("manet", LOG_LEVEL_ALL);
 	LogComponentEnable("ToraRoutingProtocol", LOG_LEVEL_ALL);
@@ -97,7 +109,7 @@ int main(int argc, char *argv[])
 	Packet::EnableChecking();
 
 
-	RoutingExperiment experiment(n, nFlows, nodeSpeed);
+	Test1 experiment(n, nFlows, nodeSpeed);
 	experiment.setXRange(xRange);
 	experiment.setYRange(yRange);
 	experiment.setPacketRate(packetRate);
@@ -108,6 +120,7 @@ int main(int argc, char *argv[])
 	Ipv4RoutingHelper * routing = new ToraHelper();
 	// Ipv4RoutingHelper * routing = new AodvHelper();
 	experiment.Run(simulationTime, routing);
+	VaryNodes(experiment , routing);
 	delete routing;
 
 }
