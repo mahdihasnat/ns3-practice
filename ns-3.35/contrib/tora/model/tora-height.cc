@@ -79,7 +79,12 @@ Height::Deserialize (Buffer::Iterator start)
 void
 Height::Print (std::ostream &os) const
 {
-	os << "tao=" << m_tao << " oid=" << m_oid << " r=" << m_r << " delta=" << m_delta << " i=" << m_i;
+	if(*this == GetNullHeight(m_i))
+	{
+		os << "Null";
+	}
+	else 
+		os << "tao=" << m_tao << " oid=" << m_oid << " r=" << m_r << " delta=" << m_delta << " i=" << m_i;
 }
 
 std::ostream &
