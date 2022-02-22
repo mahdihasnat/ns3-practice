@@ -8,6 +8,8 @@
 #include "ns3/ipv4-routing-protocol.h"
 #include "ns3/node.h"
 
+// #define NS_HELLO_LOG
+
 namespace ns3{
 
 NS_LOG_COMPONENT_DEFINE ("ToraRoutingProtocol");
@@ -112,7 +114,10 @@ RoutingProtocol::RoutingProtocol():
 				m_helloInterval(Seconds(1)),
 				m_htimer (Timer::CANCEL_ON_DESTROY),
 				m_lastBcastTime (Seconds (0)),
-				m_helloRecvTimeout(Seconds(3))
+				m_helloRecvTimeout(Seconds(3)),
+				m_maxQueueLen (64),
+				m_maxQueueTime (Seconds (30)),
+				m_queue (m_maxQueueLen, m_maxQueueTime)
 {
 	NS_LOG_FUNCTION(this);
 }
@@ -180,6 +185,13 @@ void
 RoutingProtocol::PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit unit ) const
 {
 
+	for(auto i: m_DNLinks)
+	{
+		for(auto j: i.second)
+		{
+			*stream->GetStream () << "Destination: " << i.first << " Link: " << j << "\n";
+		}
+	}
 }
 
 int64_t
@@ -269,7 +281,9 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
                    UnicastForwardCallback ucb, MulticastForwardCallback mcb,
                    LocalDeliverCallback lcb, ErrorCallback ecb)
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this << p << header << idev);
+	#endif
 
 	NS_ASSERT (m_ipv4 != 0);
 	NS_ASSERT (p != 0);
@@ -293,7 +307,9 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
 
 	if(header.GetProtocol() == GetIpv4HeaderProtocol())
 	{
+		#ifdef NS_HELLO_LOG
 		NS_LOG_DEBUG ("Recieved packet with TORA header");
+		#endif
 		RecvTora(p,header);
 		return true;
 	}
@@ -382,7 +398,9 @@ RoutingProtocol::LoopbackRoute (const Ipv4Header & hdr, Ptr<NetDevice> oif) cons
 void
 RoutingProtocol:: BroadcastMsg(Ptr<Packet> p)
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this << p);
+	#endif
 	
 	// get DownTargetCallback from IpL4Protocol
 	Ptr<IpL4Protocol> protocol = m_ipv4->GetProtocol (17);
@@ -397,13 +415,37 @@ RoutingProtocol:: BroadcastMsg(Ptr<Packet> p)
 	Ipv4Address src = m_ipv4->GetAddress(1,0).GetLocal();
 	Ipv4Address dst = m_ipv4->GetAddress(1,0).GetBroadcast();
 	uint8_t prot = 138;
+	#ifdef NS_HELLO_LOG
 	NS_LOG_DEBUG("packet: " << p << " src: " << src << " dst: " << dst << " prot: " << prot);
-
+	#endif
 	callback (p, src, dst, prot, 0);
 
 	NS_UNUSED (callback);
 }
 
+void
+RoutingProtocol::SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route)
+{
+  NS_LOG_FUNCTION (this);
+  QueueEntry queueEntry;
+  while (m_queue.Dequeue (dst, queueEntry))
+    {
+      DeferredRouteOutputTag tag;
+      Ptr<Packet> p = ConstCast<Packet> (queueEntry.GetPacket ());
+      if (p->RemovePacketTag (tag)
+          && tag.GetInterface () != -1
+          && tag.GetInterface () != m_ipv4->GetInterfaceForDevice (route->GetOutputDevice ()))
+        {
+          NS_LOG_DEBUG ("Output device doesn't match. Dropped.");
+          return;
+        }
+      UnicastForwardCallback ucb = queueEntry.GetUnicastForwardCallback ();
+      Ipv4Header header = queueEntry.GetIpv4Header ();
+      header.SetSource (route->GetSource ());
+      header.SetTtl (header.GetTtl () + 1); // compensate extra TTL decrement by fake loopback routing
+      ucb (route, p, header);
+    }
+}
 
 void
 RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header,
@@ -411,12 +453,31 @@ RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & he
 {
 	NS_LOG_FUNCTION (this << p << header);
 	NS_ASSERT (p != 0 && p != Ptr<Packet> ());
-
-
-	// create new QryHeader  packet
-	Ptr<Packet> packet = Create<Packet>();
 	
-	SendQry(header.GetDestination());
+	
+
+	QueueEntry newEntry (p, header, ucb, ecb);
+	bool result = m_queue.Enqueue (newEntry);
+	if (result)
+	{
+		NS_LOG_LOGIC ("Add packet " << p->GetUid () << " to queue. Protocol " << (uint16_t) header.GetProtocol ());
+		if(IsRouteValid(header.GetDestination()))
+		{
+			Ptr<Ipv4Route > route = Create<Ipv4Route> ();
+			NS_ASSERT(GetRoute(header.GetDestination(), route));
+			SendPacketFromQueue(header.GetDestination(), route);
+		}
+		else if(GetRouteRequiredFlag(header.GetDestination().Get()))
+		{
+			
+		}
+		else 
+		{
+			SetRouteRequiredFlag(header.GetDestination().Get());
+			SendQry(header.GetDestination());
+		}
+	}
+
 }
 
 bool
@@ -436,7 +497,9 @@ RoutingProtocol::IsMyOwnAddress (Ipv4Address src)
 void
 RoutingProtocol::RecvTora (Ptr<const Packet> p,const Ipv4Header & header)
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this << *p);
+	#endif
 	Ptr<Packet> packet = p->Copy ();
 	// NS_LOG_INFO("packet: " << packet);
 	TypeHeader theader;
@@ -446,7 +509,9 @@ RoutingProtocol::RecvTora (Ptr<const Packet> p,const Ipv4Header & header)
 		NS_ASSERT_MSG(false, "TORA packet invalid type header");
 		return;
 	}
+	#ifdef NS_HELLO_LOG
 	NS_LOG_DEBUG("header: " << theader);
+	#endif
 
 	switch(theader.Get())
 	{
@@ -478,24 +543,29 @@ RoutingProtocol::ProcessQry (Ipv4Address const & src,Ipv4Address const & dst)
 {
 
 	ProcessHello(src);
-	NS_LOG_FUNCTION (this << dst);
+	NS_LOG_FUNCTION (this <<"dst"<< dst<<"src"<<src);
 	if(GetRouteRequiredFlag(dst.Get()) == true)
 	{
 		return ;
 	}
+	NS_LOG_DEBUG(GetHeight(dst.Get()));
 }
 
 void
 RoutingProtocol::ProcessHello (Ipv4Address const & src)
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this << src);
+	#endif
 	HelloRecvUpdate(src.Get());
 }
 
 void
 RoutingProtocol:: SendHello ()
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this);
+	#endif
 	Ptr<Packet> p = Create<Packet> ();
 	HelloHeader h;
 	h.SetSrc (GetMyAddress());
@@ -509,7 +579,9 @@ RoutingProtocol:: SendHello ()
 void
 RoutingProtocol:: SendQry (Ipv4Address const & dst)
 {
+	
 	NS_LOG_FUNCTION (this << dst);
+	
 
 	Ptr<Packet> p = Create<Packet> ();
 
@@ -528,7 +600,9 @@ RoutingProtocol:: SendQry (Ipv4Address const & dst)
 void
 RoutingProtocol:: HelloTimerExpire(void)
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this);
+	#endif
 	Time offset = Time (Seconds (0));
 	if (m_lastBcastTime > Time (Seconds (0)))
 	{
@@ -670,7 +744,10 @@ RoutingProtocol:: NotifyNeighbourDown(uint32_t id)
 void 
 RoutingProtocol::HelloRecvTimerExpire(uint32_t neighbour)
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this <<" neighbour: " << neighbour);
+	#endif
+
 	NotifyNeighbourDown(neighbour);
 	m_helloRecvTimer.erase(neighbour);
 }
@@ -678,9 +755,10 @@ RoutingProtocol::HelloRecvTimerExpire(uint32_t neighbour)
 void
 RoutingProtocol:: HelloRecvUpdate(uint32_t neighbour)
 {
+	#ifdef NS_HELLO_LOG
 	NS_LOG_FUNCTION (this <<" neighbour: " << neighbour);
+	#endif
 	auto it = m_helloRecvTimer.find(neighbour);
-	NS_LOG_DEBUG((bool)(it!=m_helloRecvTimer.end()));
 	if(it != m_helloRecvTimer.end())
 	{
 		it->second.Cancel();

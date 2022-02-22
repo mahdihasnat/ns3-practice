@@ -8,10 +8,11 @@
 #include "tora-packet.h"
 #include "tora-height.h"
 
+#include "tora-rqueue.h"
+
 namespace ns3 {
 
 namespace tora {
-
 
 // enum
 // {
@@ -65,6 +66,7 @@ public:
   Ptr<Ipv4Route>LoopbackRoute (const Ipv4Header & hdr, Ptr<NetDevice> oif) const;
   void DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header,
                                       UnicastForwardCallback ucb, ErrorCallback ecb);
+  void SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route);
   bool Forwarding (Ptr<const Packet> p, const Ipv4Header & header, 
                                       UnicastForwardCallback ucb, ErrorCallback ecb);
   bool IsMyOwnAddress (Ipv4Address src);
@@ -246,6 +248,13 @@ private:
     m_DNLinks[dest].insert(neighbour);
     m_UPLinks[dest].erase(neighbour);
   }
+  void UnSetDownLink(uint dest,uint neighbour)
+  {
+    NS_ASSERT_MSG(IsDownLink(dest, neighbour), "Link is not downlink");
+    m_DNLinks[dest].erase(neighbour);
+    if(m_DNLinks[dest].empty())
+      m_DNLinks.erase(dest);
+  }
   uint32_t GetDownLinkCount(uint dest) const
   {
     auto it = m_DNLinks.find(dest);
@@ -272,6 +281,13 @@ private:
     "Height of destination is not  less than height of neighbour");
     m_UPLinks[dest].insert(neighbour);
     m_DNLinks[dest].erase(neighbour);
+  }
+  void UnSetUpLink(uint dest,uint neighbour)
+  {
+    NS_ASSERT_MSG(IsUpLink(dest, neighbour), "Link is not uplink");
+    m_UPLinks[dest].erase(neighbour);
+    if(m_UPLinks[dest].empty())
+      m_UPLinks.erase(dest);
   }
 
   bool IsUnLink(uint dest, uint neighbour) const
@@ -349,6 +365,11 @@ private:
     route->SetOutputDevice(device);
     return true;
   }
+  bool IsRouteValid(Ipv4Address dst) const
+  {
+    uint dest = dst.Get();
+    return GetDownLinkCount(dest) > 0;
+  }
 
 
 
@@ -364,6 +385,38 @@ private:
 
   void NotifyNeighbourUp(uint32_t id);
   void NotifyNeighbourDown(uint32_t id);
+
+  uint32_t m_maxQueueLen;        ///< The maximum number of packets that we allow a routing protocol to buffer.
+  Time m_maxQueueTime;                 ///< The maximum period of time that a routing protocol is allowed to buffer a packet for.
+
+  /// A "drop-front" queue used by the routing layer to buffer packets to which it does not have a route.
+  RequestQueue m_queue;
+
+  void
+  SetMaxQueueLen (uint32_t len)
+  {
+    m_maxQueueLen = len;
+    m_queue.SetMaxQueueLen (len);
+  }
+
+  void
+  SetMaxQueueTime (Time t)
+  {
+    m_maxQueueTime = t;
+    m_queue.SetQueueTimeout (t);
+  }
+
+  /**
+   * Get the maximum queue length
+   * \returns the maximum queue length
+   */
+  uint32_t GetMaxQueueLen () const
+  {
+    return m_maxQueueLen;
+  }
+  
+
+
 
 };
 
