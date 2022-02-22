@@ -399,7 +399,8 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p, const Ipv4Header &header,
     {
       route = rt.GetRoute ();
       NS_ASSERT (route != 0);
-      NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetSource ());
+      NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetSource ()
+      <<" gateway : "<<route->GetGateway() <<" outdevice " <<route->GetOutputDevice());
       if (oif != 0 && route->GetOutputDevice () != oif)
         {
           NS_LOG_DEBUG ("Output device doesn't match. Dropped.");
@@ -1818,7 +1819,7 @@ RoutingProtocol::HelloTimerExpire ()
 void
 RoutingProtocol::RreqRateLimitTimerExpire ()
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
   m_rreqCount = 0;
   m_rreqRateLimitTimer.Schedule (Seconds (1));
 }
@@ -1826,7 +1827,7 @@ RoutingProtocol::RreqRateLimitTimerExpire ()
 void
 RoutingProtocol::RerrRateLimitTimerExpire ()
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
   m_rerrCount = 0;
   m_rerrRateLimitTimer.Schedule (Seconds (1));
 }

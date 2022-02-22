@@ -12,6 +12,7 @@ def build(bld):
         'model/tora.cc',
         'model/tora-height.cc',
         'model/tora-packet.cc',
+        'model/tora-rqueue.cc',
         'model/tora-routing-protocol.cc',
         'helper/tora-helper.cc',
         ]
@@ -32,6 +33,7 @@ def build(bld):
         'model/tora.h',
         'model/tora-packet.h',
         'model/tora-height.h',
+        'model/tora-rqueue.h',
         'model/tora-routing-protocol.h',
         'helper/tora-helper.h',
         ]
