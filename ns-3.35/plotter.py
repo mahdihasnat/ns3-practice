@@ -21,7 +21,7 @@ def plot(dfs):
 			# plt.bar(time_col, val_col, label=df.name, width=1.5)
 			splot=sns.barplot(x=time_col, y=val_col, data=ndf)
 			for p in splot.patches:
-				splot.annotate(format(p.get_height(), '.1f'), 
+				splot.annotate(format(p.get_height(), '.2f'), 
 							(p.get_x() + p.get_width() / 2., p.get_height()), 
 							ha = 'center', va = 'center', 
 							xytext = (0, 9), 

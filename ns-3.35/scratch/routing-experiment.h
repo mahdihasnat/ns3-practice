@@ -63,11 +63,11 @@ public:
 	virtual void AddMobility(NodeContainer &adhocNodes);
 	NetDeviceContainer AddDevie(NodeContainer &adhocNodes);
 	Ipv4InterfaceContainer AssignAddress(NetDeviceContainer &adhocDevices);
-	void InstallInternetStack(NodeContainer &adhocNodes, Ipv4RoutingHelper *routingHelper);
+	virtual void InstallInternetStack(NodeContainer &adhocNodes, Ipv4RoutingHelper *routingHelper);
 	virtual void SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime);
 	virtual void SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16_t serverPort, double startTime, double endTime);
 	virtual void AddFlows(NodeContainer &adhocNodes);
-	void CalculateThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime);
+	void CalculateMetrics(FlowMonitorHelper &flowmonHelper, double simulationTime);
 	long double PacketDeliveryRatioL3()
 	{
 		return (long double)m_RxPacketL3 * 100.0L / (long double)m_TxPacketL3;
@@ -195,7 +195,7 @@ public:
 		m_TotalLocalDeliveredL3Packet++;
 	}
 
-	void Run(double simulationTime, Ipv4RoutingHelper *routingHelper)
+	virtual void Run(double simulationTime, Ipv4RoutingHelper *routingHelper = 0)
 	{
 		NodeContainer adhocNodes;
 		adhocNodes.Create(m_totalNodes);
@@ -246,7 +246,7 @@ public:
 		Simulator::Run();
 		Simulator::Destroy();
 
-		CalculateThroughput(flowmonHelper, simulationTime);
+		CalculateMetrics(flowmonHelper, simulationTime);
 		// flowmon->SerializeToXmlFile("manet.flowmon", true, true);
 
 		NS_LOG_INFO("Total packets sent: " << (long long)m_TxPacketL3);
@@ -423,7 +423,7 @@ void RoutingExperiment::AddFlows(NodeContainer &adhocNodes)
 	}
 }
 
-void RoutingExperiment::CalculateThroughput(FlowMonitorHelper &flowmonHelper, double simulationTime)
+void RoutingExperiment::CalculateMetrics(FlowMonitorHelper &flowmonHelper, double simulationTime)
 {
 	Ptr<FlowMonitor> flowmon = flowmonHelper.GetMonitor();
 	// get flowclassifier from flowmon object
