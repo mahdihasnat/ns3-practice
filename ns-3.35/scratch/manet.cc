@@ -181,7 +181,7 @@ void VaryNodeSpeed()
 	yRange = 600.0;
 	packetRate = 100;
 	maxPacketCount = 100;
-	simulationTime = 200.0;
+	simulationTime = 300.0;
 
 	Ipv4RoutingHelper * routing = new AodvHelper();
 	RoutingExperiment experiment(n, nFlows, nodeSpeed);
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
 	// SetUpRoutingExperiment(&experiment);
 
 	// disable hellopacket in all node of routing
-	// Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
+	Config::SetDefault("ns3::aodv::RoutingProtocol::EnableHello", BooleanValue(false));
 	
 	
 	// VaryNodes();

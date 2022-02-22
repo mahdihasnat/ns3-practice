@@ -25,6 +25,10 @@ public:
 	double m_yRange = 900.0;
 	int m_packetRate = 10;
 	uint32_t m_maxPacketCount = 1;
+	bool m_traceMobility = false;
+	bool m_traceRouting = false;
+	bool m_tracePhy = false;
+	bool m_netAnim = false;
 
 	YansWifiPhyHelper m_wifiPhy;
 	Ptr<OutputStreamWrapper> m_tpPerFlowStream;
@@ -204,17 +208,23 @@ public:
 		Ipv4InterfaceContainer adhocInterfaces = AssignAddress(adhocDevices);
 		AddFlows(adhocNodes);
 
-		AnimationInterface anim("manet.xml");
-		anim.EnablePacketMetadata(true);
-		// resize nodes
-		for (int i = 0; i < m_totalNodes; i++)
+		if(m_netAnim)
 		{
-			anim.UpdateNodeSize(i, 10, 10);
+			AnimationInterface anim("manet.xml");
+			anim.EnablePacketMetadata(true);
+			// resize nodes
+			for (int i = 0; i < m_totalNodes; i++)
+			{
+				anim.UpdateNodeSize(i, 10, 10);
+			}
 		}
 
 		// enable trace generation
-		AsciiTraceHelper ascii;
-		m_wifiPhy.EnableAsciiAll(ascii.CreateFileStream("manet.tr"));
+		if(m_tracePhy)
+		{
+			AsciiTraceHelper ascii;
+			m_wifiPhy.EnableAsciiAll(ascii.CreateFileStream("manet.tr"));
+		}
 
 		// enable flow monitor
 
@@ -223,31 +233,32 @@ public:
 		flowmon = flowmonHelper.InstallAll();
 
 		// add TraceL3 to all nodes
-		for (int i = 0; i < m_totalNodes; i++)
-		{
-			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Tx", MakeCallback(&RoutingExperiment::TxTraceL3, this));
-			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Rx", MakeCallback(&RoutingExperiment::RxTraceL3, this));
-			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Drop", MakeCallback(&RoutingExperiment::DropTraceL3, this));
-			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("SendOutgoing", MakeCallback(&RoutingExperiment::SendOutgoingTraceL3, this));
-			adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("LocalDeliver", MakeCallback(&RoutingExperiment::LocalDeliverTraceL3, this));
-		}
+		// for (int i = 0; i < m_totalNodes; i++)
+		// {
+		// 	adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Tx", MakeCallback(&RoutingExperiment::TxTraceL3, this));
+		// 	adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Rx", MakeCallback(&RoutingExperiment::RxTraceL3, this));
+		// 	adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("Drop", MakeCallback(&RoutingExperiment::DropTraceL3, this));
+		// 	adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("SendOutgoing", MakeCallback(&RoutingExperiment::SendOutgoingTraceL3, this));
+		// 	adhocNodes.Get(i)->GetObject<Ipv4L3Protocol>()->TraceConnectWithoutContext("LocalDeliver", MakeCallback(&RoutingExperiment::LocalDeliverTraceL3, this));
+		// }
 
 		Simulator::Stop(Seconds(simulationTime));
 		Simulator::Run();
 		Simulator::Destroy();
 
 		CalculateThroughput(flowmonHelper, simulationTime);
-		flowmon->SerializeToXmlFile("manet.flowmon", true, true);
+		// flowmon->SerializeToXmlFile("manet.flowmon", true, true);
 
 		NS_LOG_INFO("Total packets sent: " << (long long)m_TxPacketL3);
 		NS_LOG_INFO("Total packets received: " << (long long)m_RxPacketL3);
 		NS_LOG_INFO("Total packets dropped: " << (long long)m_DropPacketL3);
-		m_packetDelivaryRatio =PacketDeliveryRatioL3();
+		// m_packetDelivaryRatio =PacketDeliveryRatioL3();
 		NS_LOG_INFO("Packet Delivery Ratio (L3): " << m_packetDelivaryRatio << "%");
-		m_packetDropRatio = PacketDropRatioL3();
+		// m_packetDropRatio = PacketDropRatioL3();
 		NS_LOG_INFO("Packet Drop Ratio (L3): " << m_packetDropRatio << "%");
-		NS_LOG_INFO("Average end-to-end delay: " << m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet << "s");
-		m_averageEnd2EndDelay = m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet;
+		NS_LOG_INFO("Average end-to-end delay(l3): " << m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet << "s");
+		// NS_LOG_UNCOND("Average end-to-end delay(l3): " << m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet << "s");
+		// m_averageEnd2EndDelay = m_TotalEnd2EndDelay.GetSeconds() / m_TotalLocalDeliveredL3Packet;
 	}
 };
 
@@ -273,7 +284,8 @@ void RoutingExperiment::AddMobility(NodeContainer &adhocNodes)
 	streamIndex += taPositionAlloc->AssignStreams(streamIndex);
 
 	std::stringstream ssSpeed;
-	ssSpeed << "ns3::UniformRandomVariable[Min=0.0|Max=" << nodeSpeed << "]";
+	// ssSpeed << "ns3::UniformRandomVariable[Min=0.0|Max=" << nodeSpeed << "]";
+	ssSpeed << "ns3::ConstantRandomVariable[Constant=" << nodeSpeed << "]";
 	std::stringstream ssPause;
 	ssPause << "ns3::ConstantRandomVariable[Constant=" << nodePause << "]";
 
@@ -311,7 +323,7 @@ RoutingExperiment::AddDevie(NodeContainer &adhocNodes)
 	wifiChannel.AddPropagationLoss("ns3::FriisPropagationLossModel");
 	wifiChannel.AddPropagationLoss("ns3::RangePropagationLossModel", "MaxRange", DoubleValue(140)); // max range of 802.11b
 	// nakagami propagation loss model
-	wifiChannel.AddPropagationLoss("ns3::NakagamiPropagationLossModel");
+	// wifiChannel.AddPropagationLoss("ns3::NakagamiPropagationLossModel");
 
 	m_wifiPhy.SetChannel(wifiChannel.Create());
 	m_wifiPhy.Set("TxPowerStart", DoubleValue(txp));
@@ -352,7 +364,8 @@ void RoutingExperiment::InstallInternetStack(NodeContainer &adhocNodes, Ipv4Rout
 	InternetStackHelper internet;
 	internet.SetRoutingHelper(*routingHelper);
 	internet.Install(adhocNodes);
-	internet.EnableAsciiIpv4All(m_ipv4Stream);
+	if(m_traceRouting)
+		internet.EnableAsciiIpv4All(m_ipv4Stream);
 }
 
 void RoutingExperiment::SetUpServer(Ptr<Node> node, uint16_t port, double startTime, double endTime)
@@ -380,7 +393,8 @@ void RoutingExperiment::SetUpClient(Ptr<Node> node, Ipv4Address serverIp, uint16
 {
 	UdpEchoClientHelper echoClient(serverIp, serverPort);
 	echoClient.SetAttribute("MaxPackets", UintegerValue(m_maxPacketCount));
-	echoClient.SetAttribute("Interval", TimeValue(Seconds(m_totalFlows * 1.0L / m_packetRate)));
+	echoClient.SetAttribute("Interval", TimeValue(Seconds(m_totalFlows/2 * 1.0L / m_packetRate)));
+	// NS_LOG_UNCOND((Seconds(m_totalFlows/2 * 1.0L / m_packetRate)));
 	echoClient.SetAttribute("PacketSize", UintegerValue(100));
 
 	ApplicationContainer clientApps = echoClient.Install(node);
@@ -416,11 +430,19 @@ void RoutingExperiment::CalculateThroughput(FlowMonitorHelper &flowmonHelper, do
 	Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowmonHelper.GetClassifier());
 	NS_ASSERT(classifier != 0);
 
+	long double packetSent = 0;
+	long double packetReceived = 0;
+	long double packetDropped = 0;
+	long double endToEndDelay = 0;
+	
+	int totalFlows = 0;
+
 	// iterator over every flow and print the flow monitor statistics
 	const FlowMonitor::FlowStatsContainer &stats = flowmon->GetFlowStats();
 	long double total_rx = 0;
 	Time start_time = Seconds(simulationTime);
 	Time end_time = Seconds(0);
+	
 	for (FlowMonitor::FlowStatsContainer::const_iterator i = stats.begin(); i != stats.end(); ++i)
 	{
 		FlowId flowId = i->first;
@@ -430,13 +452,18 @@ void RoutingExperiment::CalculateThroughput(FlowMonitorHelper &flowmonHelper, do
 		if(t.destinationPort == 654) continue;
 		if(t.sourcePort == 654) continue;
 
-		ostringstream oss;
-		oss << "(" << t.sourceAddress << "," << t.sourcePort << ")->(" << t.destinationAddress << "," << t.destinationPort << ")";
-		string flowDesc = oss.str();
+		if(m_traceRouting)
+		{
 
-		long double throuputPerFlow = fs.rxBytes ? (fs.rxBytes * 8.0 / (fs.timeLastRxPacket.GetSeconds() - fs.timeFirstTxPacket.GetSeconds())) / 1e6 : 0; // in Mbps
+			ostringstream oss;
+			oss << "(" << t.sourceAddress << "," << t.sourcePort << ")->(" << t.destinationAddress << "," << t.destinationPort << ")";
+			string flowDesc = oss.str();
 
-		(*m_tpPerFlowStream->GetStream()) << flowDesc << "\t" << throuputPerFlow << "\n";
+			long double throuputPerFlow = fs.rxBytes ? (fs.rxBytes * 8.0 / (fs.timeLastRxPacket.GetSeconds() - fs.timeFirstTxPacket.GetSeconds())) / 1e6 : 0; // in Mbps
+			
+			(*m_tpPerFlowStream->GetStream()) << flowDesc << "\t" << throuputPerFlow << "\n";
+
+		}
 
 		NS_LOG_INFO("fid: " << flowId << " bytes: " << fs.rxBytes << " (" << t.sourceAddress << "," << t.sourcePort << ")->(" << t.destinationAddress << "," << t.destinationPort << ")");
 		// NS_LOG_INFO("start time: " << fs.timeFirstTxPacket.GetSeconds() << " end time: " << fs.timeLastRxPacket.GetSeconds() << " duration: " << fs.timeLastRxPacket.GetSeconds() - fs.timeFirstTxPacket.GetSeconds());
@@ -445,11 +472,30 @@ void RoutingExperiment::CalculateThroughput(FlowMonitorHelper &flowmonHelper, do
 
 		start_time = min(start_time, fs.timeFirstTxPacket);
 		end_time = max(end_time, fs.timeLastRxPacket);
+
+		totalFlows++;
+		packetSent+= fs.txPackets;
+		packetReceived+= fs.rxPackets;
+		packetDropped+= fs.lostPackets;
+		endToEndDelay+= fs.delaySum.GetSeconds();
+
 	}
 	NS_LOG_INFO("Total Rx: " << total_rx);
 	NS_LOG_INFO("Start time: " << start_time);
 	NS_LOG_INFO("End time: " << end_time);
-	long double throughput = total_rx ? total_rx * 8.0 / (end_time.GetSeconds() - start_time.GetSeconds()) / 1e6 : 0;
+	long double throughput = total_rx ? total_rx * 8.0 / (end_time.GetSeconds() - start_time.GetSeconds()) / 1e3 : 0;
 	m_throughput=throughput;
 	NS_LOG_INFO("Average Throughput: " << throughput << " Mbps");
+	NS_LOG_INFO("Packet Sent (flowmon): " << packetSent);
+	NS_LOG_INFO("Packet Received (flowmon): " << packetReceived);
+	NS_LOG_INFO("Packet Dropped (flowmon): " << packetDropped);
+	NS_LOG_INFO("End to End Delay (flowmon): " << endToEndDelay);
+	NS_LOG_INFO("Total Flows (flowmon): " << totalFlows);
+	NS_LOG_INFO("Packet Delivery Ratio (flowmon): " << packetReceived / packetSent*100);
+	NS_LOG_INFO("Packet Drop Ratio (flowmon): " << packetDropped / packetSent*100);
+	NS_LOG_INFO("Average End to End Delay (flowmon): " << endToEndDelay / totalFlows);
+	// NS_LOG_UNCOND("Average End to End Delay (flowmon): " << endToEndDelay / packetReceived);
+	m_averageEnd2EndDelay = endToEndDelay / packetReceived;
+	m_packetDelivaryRatio = packetReceived / packetSent*100;
+	m_packetDropRatio = packetDropped / packetSent*100;
 }
