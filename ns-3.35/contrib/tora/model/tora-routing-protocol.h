@@ -82,10 +82,15 @@ protected:
   virtual void RecvTora (Ptr<const Packet> , const Ipv4Header & );
   void ProcessQry (Ipv4Address const & src,Ipv4Address const & dst);
   void ProcessHello (Ipv4Address const & src);
-  
+  void ProcessUpd(Ipv4Address dst,Height h_n);
+
+
   void BroadcastMsg(Ptr<Packet> p);
   void SendHello ();
   void SendQry (Ipv4Address const & dst);
+  void SendUpd(Ipv4Address const & dst);
+
+  void SendClr(Ipv4Address const & dst,Time t ,uint32_t oid);
 
 private:
 
@@ -186,6 +191,28 @@ private:
   {
     m_heightNeighbours[dest][neighbour] = height;
   }
+
+  Height GetMinNonNullNeighbourHeight(uint32_t dest) const
+  {
+    bool found = 0;
+    Height ret = Height::GetNullHeight(dest);
+    auto it = m_heightNeighbours.find(dest);
+    if(it == m_heightNeighbours.end())
+    {
+      return Height::GetNullHeight(dest);
+    }
+    for(auto j: it->second)
+    {
+      if(!j.second.IsNull())
+      {
+        found = 1;
+        ret = std::min(ret , j.second);
+      }
+    }
+    NS_ASSERT(found);
+    return ret;
+  }
+
 
 // Each node i (other than the destination) maintains its
 // height, Hi. Initially the height of each node in the network
@@ -294,20 +321,263 @@ private:
   {
     return (!IsDownLink(dest, neighbour)) && (!IsUpLink(dest, neighbour));
   }
+  void UnSetUpDownLink(uint dest,uint neighbour)
+  {
+    auto it = m_UPLinks.find(dest);
+    if(it != m_UPLinks.end())
+    {
+      it->second.erase(neighbour);
+      if(it->second.empty())
+        m_UPLinks.erase(dest);
+    }
+    it = m_DNLinks.find(dest);
+    if(it != m_DNLinks.end())
+    {
+      it->second.erase(neighbour);
+      if(it->second.empty())
+        m_DNLinks.erase(dest);
+    }
+  }
+
+  void UpdateUpDownLinkForce(uint dst, uint neighbour)
+  {
+    if(IsDownLink(dst, neighbour))
+      UnSetDownLink(dst, neighbour);
+    if(IsUpLink(dst, neighbour))
+      UnSetUpLink(dst, neighbour);
+    if(GetHeight(dst) < GetNeighbourHeight(dst, neighbour))
+      SetUpLink(dst, neighbour);
+    else
+      SetDownLink(dst, neighbour);
+
+  }
+
+  void UpdateUpDownLinks(uint dest)
+  {
+    auto it = m_UPLinks.find(dest);
+    if(it != m_UPLinks.end())
+    {
+      bool found = 0;
+      do
+      {
+        found=0;
+        for(auto j: it->second)
+        {
+          if(GetNeighbourHeight(dest, j) < GetHeight(dest) or GetHeight(dest).IsNull())
+          {
+            found =1;
+            it->second.erase(j);
+            SetDownLink(dest, j);
+            break;
+          }
+        }
+      }
+      while (found);
+    }
+    it = m_DNLinks.find(dest);
+    if(it != m_DNLinks.end())
+    {
+      bool found = 0;
+      do
+      {
+        found =0;
+        for(auto j: it->second)
+        {
+          if(GetNeighbourHeight(dest, j) > GetHeight(dest))
+          {
+            found =1;
+            it->second.erase(j);
+            SetUpLink(dest, j);
+            
+            break;
+          }
+        }
+      }
+      while(found);
+    }
+  }
 
   void RemoveUpDownLink(uint neighbour)
   {
-    NS_ASSERT_MSG(false ,"Not implemented");
-    bool found = false;
-    for(auto it = m_DNLinks.begin(); it != m_DNLinks.end(); ++it)
+    
+    for(auto i: m_UPLinks)
     {
-      if(it->second.find(neighbour) != it->second.end())
-      {
-        NS_ASSERT_MSG(found == false, "Found more than one link");
-        it->second.erase(neighbour);
-        found = true;
+      auto j = i.second.find(neighbour);
+      if(j == i.second.end())
+        continue;
+      i.second.erase(j);
+      SetNeighbourHeight(i.first ,neighbour , Height::GetNullHeight(neighbour));
+      if(i.second.empty())
+        m_UPLinks.erase(i.first);
+    }
+    for(auto i: m_DNLinks)
+    {
+      auto j = i.second.find(neighbour);
+      if(j == i.second.end())
+        continue;
+      i.second.erase(j);
+      if(i.second.empty()){
+        uint dest = i.first;
+        SetNeighbourHeight(i.first ,neighbour , Height::GetNullHeight(neighbour));
+        m_DNLinks.erase(dest);
+         // case 1
+         
+          // if any up stream then case 1, set null otherwise
+
+          auto it = m_UPLinks.find(dest);
+
+          if(it != m_UPLinks.end())
+          {
+            // up steam found
+            Height h = Height::GetZeroHeight(GetRouterId());
+            h.SetTao(Simulator::Now());
+            h.SetOid(GetRouterId());
+
+            SetHeight(dest, h);
+            UpdateUpDownLinks(dest);
+            SendUpd(Ipv4Address(dest));
+
+          }
+          else 
+          {
+            // no up stream found
+            SetHeight(dest, Height::GetNullHeight(GetRouterId()));
+          }
+
       }
     }
+    
+    
+
+  }
+  bool IsAllNeighbourSameReferenceLevel(uint dest,Height &same) const
+  {
+    auto it = m_heightNeighbours.find(dest);
+    if(it == m_heightNeighbours.end())
+      return true;
+  bool found =0;
+  Height h ;
+    for(auto j: it->second)
+    {
+      if(found)
+      {
+        if(h.GetTao() != j.second.GetTao()) return false;
+        if(h.GetOid() != j.second.GetOid()) return false;
+        if(h.GetR() != j.second.GetR()) return false;
+        
+      }
+      else 
+      {
+        h=j.second;
+        h.SetDelta(0);
+        h.SetI(0);
+        same = h;
+        found =1;
+      }
+    }
+    return true;
+  }
+
+  void RecoverFailureOnUpd(uint dest)
+  {
+    Height same_height;
+    if(!IsAllNeighbourSameReferenceLevel(dest,same_height))
+    {
+      // case 2 propagate highest ref level
+      Height h;
+      bool found =0;
+      auto it = m_heightNeighbours.find(dest);
+      for(auto j: it->second)
+      {
+        if(found)
+        {
+          if(h.GetTao() < j.second.GetTao())
+          {
+            h = j.second;
+          }
+          else if(h.GetTao() > j.second.GetTao())
+            continue;
+          
+          if(h.GetOid() < j.second.GetOid())
+          {
+            h = j.second;
+          }
+          else if(h.GetOid() > j.second.GetOid())
+            continue;
+          
+          if(h.GetR() < j.second.GetR())
+          {
+            h = j.second;
+          }
+          else if(h.GetR() > j.second.GetR())
+            continue;
+          
+          if(h.GetDelta() > j.second.GetDelta())
+          {
+            h = j.second;
+          }
+          else if(h.GetDelta() < j.second.GetDelta())
+            continue;
+          
+          if(h.GetI() > j.second.GetI())
+          {
+            h = j.second;
+          }
+          else if(h.GetI() < j.second.GetI())
+            continue;
+
+          NS_ASSERT(0);
+
+        }
+        else
+        {
+          found = 1;
+          h = j.second;
+          
+        }
+      }
+      NS_ASSERT(h.GetDelta()>0);
+      h.SetDelta(h.GetDelta()-1);
+      h.SetI(GetRouterId());
+      SetHeight(dest, h);
+      UpdateUpDownLinks(dest);
+      SendUpd(Ipv4Address(dest));
+
+    }
+
+    // is reflection bit is 1
+    if(!same_height.GetR())
+    {
+      //case 3
+      //  reflect back at higher sub lebel
+
+      same_height.SetR(true);
+      same_height.SetDelta(0);
+      same_height.SetI(GetRouterId());
+      SetHeight(dest, same_height);
+      UpdateUpDownLinks(dest);
+      SendUpd(Ipv4Address(dest));
+
+    }
+
+    if(same_height.GetOid() != GetRouterId())
+    {
+      //case 5
+      // generate new ref level
+      Height newHeight = Height::GetZeroHeight(GetRouterId());
+      newHeight.SetTao(Simulator::Now());
+      newHeight.SetOid(GetRouterId());
+
+      SetHeight(dest, newHeight);
+      UpdateUpDownLinks(dest);
+      SendUpd(Ipv4Address(dest));
+
+    }
+
+    // case 4
+    // partition
+    
+    NS_ASSERT(0);
 
   }
 
@@ -342,7 +612,7 @@ private:
     auto it = m_timeSentUpd.find(dest);
     if(it == m_timeSentUpd.end())
     {
-      NS_ASSERT(false);
+      return Time::Min();
     }
     return it->second;
   }

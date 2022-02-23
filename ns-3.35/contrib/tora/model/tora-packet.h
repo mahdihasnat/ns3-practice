@@ -210,6 +210,39 @@ public:
 std::ostream & operator<< (std::ostream & os, UpdHeader const &);
 
 
+class ClrHeader:public Header
+{
+
+public:
+Ipv4Address m_dst; 		///< destination ip address ,32 bit
+Time m_tao;		///< time of arrival ,
+uint32_t m_oid;
+
+	ClrHeader(Ipv4Address dst = Ipv4Address(), Time tao = Time() , uint32_t oid = 0)
+	{
+		m_dst = dst;
+		m_tao = tao;
+		m_oid = oid;
+	}
+	virtual ~ClrHeader()
+	{
+
+	}
+	//object
+	static TypeId GetTypeId ();
+	TypeId GetInstanceTypeId () const;
+
+	//header
+	uint32_t GetSerializedSize () const;
+	void Serialize (Buffer::Iterator start) const;
+	uint32_t Deserialize (Buffer::Iterator start);
+	void Print (std::ostream &os) const;
+
+};
+
+std::ostream & operator<< (std::ostream & os, ClrHeader const &);
+
+
 } // tora
 
 

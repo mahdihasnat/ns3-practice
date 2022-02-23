@@ -184,12 +184,12 @@ RoutingProtocol::GetRouterId (void) const
 void
 RoutingProtocol::PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit unit ) const
 {
-
+	*stream->GetStream() <<"RouterId: " << Ipv4Address(GetRouterId()) << std::endl;
 	for(auto i: m_DNLinks)
 	{
 		for(auto j: i.second)
 		{
-			*stream->GetStream () << "Destination: " << i.first << " Link: " << j << "\n";
+			*stream->GetStream () << "Destination: " << Ipv4Address(i.first) << " Link: " << Ipv4Address(j) << "\n";
 		}
 	}
 }
@@ -320,6 +320,8 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
 		return true;
 	}
 
+	NS_LOG_DEBUG ("Packet for " << dst << " from " << origin);
+
 
 	// Unicast local delivery
 	if (m_ipv4->IsDestinationAddress (dst, iif))
@@ -356,7 +358,21 @@ RoutingProtocol::Forwarding (Ptr<const Packet> p, const Ipv4Header & header,
                              UnicastForwardCallback ucb, ErrorCallback ecb)
 {
 	NS_LOG_FUNCTION(this<<p);
-	NS_ASSERT_MSG(false ,"not implemented");
+
+	Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+
+	if(GetRoute(header.GetDestination() , route ))
+	{
+		NS_LOG_INFO("Found route to " << header.GetDestination() << " via " << route->GetGateway());
+		ucb (route, p, header);
+		return true;
+	}
+	else 
+	{
+		NS_LOG_INFO("No route to " << header.GetDestination());
+		DeferredRouteOutput (p, header, ucb, ecb);
+	}
+
 	return false;
 }
 
@@ -530,13 +546,41 @@ RoutingProtocol::RecvTora (Ptr<const Packet> p,const Ipv4Header & header)
 				ProcessHello(hheader.GetSrc());
 			}
 			break;
-
+		case TORATYPE_UPD:
+			{
+				UpdHeader uheader;
+				packet->RemoveHeader(uheader);
+				ProcessUpd(uheader.m_dst,uheader.m_height);
+			}
+			break;
 		default:
 			NS_ASSERT_MSG(false, "TORA packet not handled");
 	}
 }
 
 
+
+// When a node with no directed links and an un-set
+// route-required flag requires a route to the destination, it
+// broadcasts a QRY packet and sets its route-required flag.
+// When a node i receives a QRY it reacts as follows. (a) If
+// the receiving node has no downstream links and its route-
+// required flag is un-set, it re-broadcasts the QRY packet and
+// sets its route-required flag. (b) If the receiving node has no
+// downstream links and the route,-required flag is set, it
+// discards the QRY packet. (c) If the receiving node has at
+// least one downstream link and its height is NULL, it sets
+// its height to H , = (5, aid,! ri, 4 + 1, i), where H N , , = (z,,
+// oidj, rj, a , j ) is the minimum height of its non-NULL
+// neighbors, and broadcasts an UPD packet. (d) If the
+// receiving node has at least one downstream link and its
+// height is non-NULL, it first compares the time the last
+// UPD packet was broadcast to the time the link over which
+// the QRY packet was received became active. If an UPD
+// packet has been broadcast since the link became active , it
+// discards the QRY packet; otherwise, it broadcasts an UPD
+// packet. If a node has the route-required flag set when a new
+// link is established, it broadcasts a QRY packet.
 
 void
 RoutingProtocol::ProcessQry (Ipv4Address const & src,Ipv4Address const & dst)
@@ -549,6 +593,96 @@ RoutingProtocol::ProcessQry (Ipv4Address const & src,Ipv4Address const & dst)
 		return ;
 	}
 	NS_LOG_DEBUG(GetHeight(dst.Get()));
+	
+	if(IsRouteValid(dst) == 0)
+	{
+		//no down stream & route required is unset
+		NS_ASSERT(GetRouteRequiredFlag(dst.Get()) == false);
+		SetRouteRequiredFlag(dst.Get());
+		SendQry(dst);
+		return ;
+	}
+	// valid route found
+	if(GetHeight(dst.Get()).IsNull())
+	{
+		// this height is null
+		Height h = GetMinNonNullNeighbourHeight(dst.Get());
+		h.SetDelta(h.GetDelta()+1);
+		h.SetI(GetRouterId());
+		SetHeight(dst.Get(), h);
+		UpdateUpDownLinks(dst.Get());
+		SendUpd(dst);
+		return ;
+	}
+
+
+
+	// if(GetHeight(dst.Get()).GetR() == 0) //this check exist in rfc but not in main paper
+	{
+		if(GetTimeActive(src.Get())>GetTimeSentUpd(dst.Get()))
+		{
+			SendUpd(dst);
+			// send Upd packet for dst
+		}
+	}
+	
+}
+
+
+void 
+RoutingProtocol::ProcessUpd(Ipv4Address dst,Height heightNeigh)
+{
+	NS_LOG_FUNCTION (this <<"dst"<< dst<<"heightNeigh"<<heightNeigh);
+	ProcessHello(Ipv4Address(heightNeigh.GetI()));
+
+	
+
+	if(dst.Get() == GetRouterId())
+	{
+		NS_LOG_DEBUG("dst is me");
+		return;
+	}
+
+	if(GetRouteRequiredFlag(dst.Get()) == true)
+	{
+		NS_ASSERT(GetHeight(dst.Get()).IsNull());
+		SetNeighbourHeight(dst.Get(), heightNeigh.GetI(), heightNeigh);
+		Height h = GetMinNonNullNeighbourHeight(dst.Get());
+		NS_ASSERT(h.IsNull() == false);
+		h.SetDelta(h.GetDelta()+1);
+		h.SetI(GetRouterId());
+		SetHeight(dst.Get(), h);
+		UpdateUpDownLinks(dst.Get());
+
+		UpdateUpDownLinkForce(dst.Get(), heightNeigh.GetI());
+
+
+		SendUpd(dst);
+		UnsetRouteRequiredFlag(dst.Get());
+		// output stream wrapper for cout
+		Ptr<OutputStreamWrapper> stream = Create<OutputStreamWrapper> ("tora.txt", std::ios::app);
+		PrintRoutingTable(stream, Time::NS);
+		Ptr<Ipv4Route> r = Create<Ipv4Route>();
+		NS_ASSERT(GetRoute(dst , r));
+		SendPacketFromQueue(dst,r);
+		return;
+	}
+
+	SetNeighbourHeight(dst.Get(),heightNeigh.GetI(),heightNeigh);
+	// upd link status
+	UpdateUpDownLinkForce(dst.Get() , heightNeigh.GetI());
+
+	if(IsRouteValid(dst) == 0)
+	{
+		// last link broken
+		// not for a failure
+
+
+	}
+
+	// NS_ASSERT(0);
+
+
 }
 
 void
@@ -595,6 +729,47 @@ RoutingProtocol:: SendQry (Ipv4Address const & dst)
 	
 	m_lastBcastTime = Simulator::Now();
 	BroadcastMsg(p);
+}
+
+void
+RoutingProtocol::SendUpd(Ipv4Address const & dst)
+{
+
+	NS_LOG_FUNCTION (this << dst);
+
+	SetTimeSentUpd(dst.Get(),Simulator::Now());
+
+	Ptr<Packet> p = Create<Packet> ();
+	
+	UpdHeader updHeader;
+	updHeader.m_dst = dst;
+	updHeader.m_height = GetHeight(dst.Get());
+	p->AddHeader(updHeader);
+	
+	TypeHeader typeHeader(TORATYPE_UPD);
+	p->AddHeader(typeHeader);
+
+	SetTimeSentUpd(dst.Get(),Simulator::Now());
+	BroadcastMsg(p);
+}
+
+void
+RoutingProtocol::SendClr(Ipv4Address const & dst,Time t ,uint32_t oid)
+{
+	NS_LOG_FUNCTION (this << dst);
+	Ptr<Packet> p = Create<Packet> ();
+	
+	ClrHeader clrHeader;
+	clrHeader.m_dst = dst;
+	clrHeader.m_tao = t;
+	clrHeader.m_oid = oid;
+	p->AddHeader(clrHeader);
+
+	TypeHeader typeHeader(TORATYPE_CLR);
+	p->AddHeader(typeHeader);
+
+	BroadcastMsg(p);
+
 }
 
 void
@@ -671,6 +846,8 @@ RoutingProtocol::Start(void)
 //          it in the queue to be sent to all neighbors.  Event Processing
 //          Complete.
 
+//11 d.2.5 ,If a node has the route-required flag set when a new
+// link is established, it broadcasts a QRY packet
 
 void
 RoutingProtocol:: NotifyNeighbourUp(uint32_t id)
@@ -680,7 +857,7 @@ RoutingProtocol:: NotifyNeighbourUp(uint32_t id)
 	SetTimeActive(id, Simulator::Now()); // for all dest
 	AddCurrentNeighbour(id); // for all dest
 	{
-		NS_ASSERT(GetHeight(id) == Height::GetNullHeight(id));
+		// NS_ASSERT(GetHeight(id) == Height::GetNullHeight(id));
 		Height h = Height::GetZeroHeight(id);
 		SetNeighbourHeight(id,id,h); // for dest = id
 		h.SetDelta(1);
@@ -688,7 +865,19 @@ RoutingProtocol:: NotifyNeighbourUp(uint32_t id)
 		SetHeight(id,h); // for dest = id
 		SetDownLink(id,id); // for dest = id
 
-		NS_ASSERT_MSG(GetRouteRequiredFlag(id) == false, "Route required flag is set on new link: not implemented");
+		for(uint32_t route_req_dest: m_routeRequiredFlag)
+		{
+			SendQry(Ipv4Address(route_req_dest));
+		}
+		if(GetRouteRequiredFlag(id))
+		{
+			Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+			GetRoute(Ipv4Address(id),route);
+			SendPacketFromQueue(Ipv4Address(id),route);
+			SendUpd(Ipv4Address(id));
+		}
+		// NS_ASSERT_MSG(GetRouteRequiredFlag(id) == false, "Route required flag is set on new link: not implemented");
+
 	}
 	
 	// for other dest , defined default

@@ -40,6 +40,17 @@ public:
 	static Height GetNullHeight(uint32_t i);
 	static Height GetZeroHeight(uint32_t i);
 
+	bool IsNull() const
+	{
+		return *this == GetNullHeight(m_i);
+	}
+
+	bool IsZero() const
+	{
+		return *this == GetZeroHeight(m_i);
+	}
+
+
 	// Objects
 	static TypeId GetTypeId (void);
 	TypeId GetInstanceTypeId (void) const;
@@ -65,11 +76,25 @@ public:
 	{
 		m_i = i;
 	}
+	void SetR(bool r)
+	{
+		m_r = r;
+	}
+
+	void SetTao (Time tao)
+	{
+		m_tao = tao;
+	}
+	void SetOid (uint32_t oid)
+	{
+		m_oid = oid;
+	}
 
 
 	bool operator <  (const Height &h) const;
 	bool operator == (const Height &h) const;
 	bool operator != (const Height &h) const;
+	bool operator >  (const Height &h) const;
 };
 
 std::ostream & operator<< (std::ostream & os, const Height & h);

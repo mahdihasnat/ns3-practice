@@ -333,5 +333,66 @@ std::ostream & operator<< (std::ostream & os, UpdHeader const &h)
   return os;
 }
 
+//-----------------------------------------------------------------------------
+// ClrHeader
+//-----------------------------------------------------------------------------
+
+TypeId
+ClrHeader::GetTypeId ()
+{
+  static TypeId tid = TypeId ("ns3::tora::ClrHeader")
+          .SetParent<Header> ()
+          .SetGroupName ("Tora")
+          .AddConstructor<ClrHeader> ()
+          ;
+  return tid;
+
+}
+
+TypeId
+ClrHeader::GetInstanceTypeId () const
+{
+  return GetTypeId ();
+}
+
+uint32_t
+ClrHeader::GetSerializedSize () const
+{
+  return 16;
+}
+void
+ClrHeader::Serialize (Buffer::Iterator start) const
+{
+  Buffer::Iterator i = start;
+  WriteTo(i, m_dst);
+  start.WriteU64 (m_tao.GetInteger ());
+	start.WriteU32 (m_oid);
+}
+
+uint32_t
+ClrHeader::Deserialize (Buffer::Iterator start)
+{
+  Buffer::Iterator i = start;
+  ReadFrom(i, m_dst);
+  m_tao = Time::FromInteger (i.ReadU64 (), Time::GetResolution());
+  m_oid = i.ReadU32 ();
+  uint32_t dist = i.GetDistanceFrom (start);
+  NS_ASSERT_MSG(dist == GetSerializedSize (), "ClrHeader::Deserialize(): dist != GetSerializedSize ()");
+  return dist;
+}
+
+void
+ClrHeader::Print (std::ostream &os) const
+{
+  os << "dst: " << m_dst << " tao: " << m_tao << " oid: " << m_oid;
+}
+
+std::ostream & operator<< (std::ostream & os, ClrHeader const &h)
+{
+  h.Print (os);
+  return os;
+}
+
+
 } // tora
 } // ns3

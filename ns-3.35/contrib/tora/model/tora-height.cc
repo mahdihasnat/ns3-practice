@@ -141,6 +141,12 @@ Height::GetI() const
 bool
 Height:: operator<(Height const &h) const
 {
+	if(IsNull() && h.IsNull())
+		return false;
+	if(h.IsNull())
+		return true;
+	if(IsNull())
+		return false;
 	if(m_tao != h.GetTao())	return m_tao < h.GetTao();
 	if(m_oid != h.GetOid())	return m_oid < h.GetOid();
 	if(m_r != h.GetR())		return m_r < h.GetR();
@@ -162,6 +168,12 @@ bool
 Height:: operator!=(Height const &h) const
 {
 	return !(*this == h);
+}
+
+bool
+Height::operator>(Height const &h) const
+{
+	return h < *this;
 }
 
 } // tora
